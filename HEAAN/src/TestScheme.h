@@ -18,6 +18,9 @@ public:
 	//   STANDARD TESTS
 	//----------------------------------------------------------------------------------
 
+	static void testEncode(long logq, long logp, long logn);
+
+	static void testEncodeSingle(long logq, long logp);
 
 	static void testEncrypt(long logq, long logp, long logn);
 

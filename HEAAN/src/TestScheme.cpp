@@ -29,6 +29,56 @@ namespace heaan {
 //   STANDARD TESTS
 //----------------------------------------------------------------------------------
 
+void TestScheme::testEncode(long logq, long logp, long logn) {
+	cout << "!!! START TEST ENCODE !!!" << endl;
+	srand(time(NULL));
+	SetNumThreads(8);
+	TimeUtils timeutils;
+	Ring ring;
+	SecretKey secretKey(ring);
+	Scheme scheme(secretKey, ring);
+
+	long n = (1 << logn);
+	complex<double>* mvec = EvaluatorUtils::randomComplexArray(n);
+	Plaintext plain;
+
+	timeutils.start("Encode");
+	scheme.encode(plain, mvec, n, logp, logq);
+	timeutils.stop("Encode");
+
+	timeutils.start("Decode");
+	complex<double>* dvec = scheme.decode(plain);
+	timeutils.stop("Decode");
+
+	StringUtils::compare(mvec, dvec, n, "val");
+
+	cout << "!!! END TEST ENCODE !!!" << endl;
+}
+
+void TestScheme::testEncodeSingle(long logq, long logp) {
+	cout << "!!! START TEST ENCODE SINGLE !!!" << endl;
+	srand(time(NULL));
+	SetNumThreads(8);
+	TimeUtils timeutils;
+	Ring ring;
+	SecretKey secretKey(ring);
+	Scheme scheme(secretKey, ring);
+
+	complex<double> mval = EvaluatorUtils::randomComplex();
+	Plaintext plain;
+
+	timeutils.start("Encode Single");
+	scheme.encodeSingle(plain, mval, logp, logq);
+	timeutils.stop("Encode Single");
+
+	timeutils.start("Decode Single");
+	complex<double> dval = scheme.decodeSingle(plain);
+	timeutils.stop("Decode Single");
+
+	StringUtils::compare(mval, dval, "val");
+
+	cout << "!!! END TEST ENCODE SINGLE !!!" << endl;
+}
 
 void TestScheme::testEncrypt(long logq, long logp, long logn) {
 	cout << "!!! START TEST ENCRYPT !!!" << endl;
