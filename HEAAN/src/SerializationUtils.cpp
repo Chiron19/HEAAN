@@ -15,6 +15,10 @@ namespace heaan {
 void SerializationUtils::writeCiphertext(Ciphertext& cipher, string path) {
 	fstream fout;
 	fout.open(path, ios::binary|ios::out);
+	if (!fout.is_open()) {
+		cerr << "Error opening file for writing: " << path << endl;
+		return;
+	}
 	long n = cipher.n;
 	long logp = cipher.logp;
 	long logq = cipher.logq;
@@ -36,29 +40,37 @@ void SerializationUtils::writeCiphertext(Ciphertext& cipher, string path) {
 		fout.write(reinterpret_cast<char*>(bytes), np);
 	}
 	fout.close();
+	cout << "Ciphertext written: n=" << n << ", logp=" << logp << ", logq=" << logq << endl;
 }
 
 Ciphertext* SerializationUtils::readCiphertext(string path) {
 	long n, logp, logq;
 	fstream fin;
 	fin.open(path, ios::binary|ios::in);
+	if (!fin.is_open()) {
+		cerr << "Error opening file for reading: " << path << endl;
+		return nullptr;
+	}
 	fin.read(reinterpret_cast<char*>(&n), sizeof(long));
 	fin.read(reinterpret_cast<char*>(&logp), sizeof(long));
 	fin.read(reinterpret_cast<char*>(&logq), sizeof(long));
 
+	cout << "Ciphertext Read: n=" << n << ", logp=" << logp << ", logq=" << logq << endl;
+
 	long np = ceil(((double)logq + 1)/8);
 	unsigned char* bytes = new unsigned char[np];
-	Ciphertext cipher(logp, logq, n);
+	Ciphertext* cipher = new Ciphertext(logp, logq, n); // Allocate on heap
 	for (long i = 0; i < N; ++i) {
 		fin.read(reinterpret_cast<char*>(bytes), np);
-		ZZFromBytes(cipher.ax[i], bytes, np);
+		ZZFromBytes(cipher->ax[i], bytes, np);
 	}
 	for (long i = 0; i < N; ++i) {
 		fin.read(reinterpret_cast<char*>(bytes), np);
-		ZZFromBytes(cipher.bx[i], bytes, np);
+		ZZFromBytes(cipher->bx[i], bytes, np);
 	}
 	fin.close();
-	return &cipher;
+	delete[] bytes;
+	return cipher;
 }
 
 void SerializationUtils::writeKey(Key* key, string path) {
@@ -70,13 +82,13 @@ void SerializationUtils::writeKey(Key* key, string path) {
 }
 
 Key* SerializationUtils::readKey(string path) {
-	Key key;
+	Key* key = new Key();
 	fstream fin;
 	fin.open(path, ios::binary|ios::in);
-	fin.read(reinterpret_cast<char*>(key.rax), Nnprimes*sizeof(uint64_t));
-	fin.read(reinterpret_cast<char*>(key.rbx), Nnprimes*sizeof(uint64_t));
+	fin.read(reinterpret_cast<char*>(key->rax), Nnprimes*sizeof(uint64_t));
+	fin.read(reinterpret_cast<char*>(key->rbx), Nnprimes*sizeof(uint64_t));
 	fin.close();
-	return &key;
+	return key;
 }
 
 }  // namespace heaan

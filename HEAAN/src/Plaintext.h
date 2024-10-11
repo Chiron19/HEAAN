@@ -25,6 +25,8 @@ public:
 
 	Plaintext(long logp = 0, long logq = 0, long n = 0);
 
+	void free();
+
 	virtual ~Plaintext();
 };
 

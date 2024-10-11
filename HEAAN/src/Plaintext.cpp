@@ -13,6 +13,12 @@ Plaintext::Plaintext(long logp, long logq, long n) : logp(logp), logq(logq), n(n
 
 }
 
+void Plaintext::free() {
+	for (long i = 0; i < N; ++i) {
+		clear(mx[i]);
+	}
+}
+
 Plaintext::~Plaintext() {
 	delete[] mx;
 }

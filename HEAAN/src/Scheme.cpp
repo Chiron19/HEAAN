@@ -24,10 +24,10 @@ Scheme::Scheme(SecretKey& secretKey, Ring& ring, bool isSerialized) : ring(ring)
 };
 
 Scheme::~Scheme() {
-  for (auto const& t : keyMap)
-	delete t.second;
-  for (auto const& t : leftRotKeyMap)
-	delete t.second;
+	for (auto const& t : keyMap)
+		delete t.second;
+	for (auto const& t : leftRotKeyMap)
+		delete t.second;
 }
 
 void Scheme::addEncKey(SecretKey& secretKey) {
@@ -45,7 +45,7 @@ void Scheme::addEncKey(SecretKey& secretKey) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "serkey/ENCRYPTION.txt";
+		string path = "./serkey/ENCRYPTION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(ENCRYPTION, path));
 		delete key;
@@ -75,7 +75,7 @@ void Scheme::addMultKey(SecretKey& secretKey) {
 	ring.CRT(key->rbx, bx, nprimes);
 	delete[] ax; delete[] bx;
 	if(isSerialized) {
-		string path = "serkey/MULTIPLICATION.txt";
+		string path = "./serkey/MULTIPLICATION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(MULTIPLICATION, path));
 		delete key;
@@ -105,7 +105,7 @@ void Scheme::addConjKey(SecretKey& secretKey) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "serkey/CONJUGATION.txt";
+		string path = "./serkey/CONJUGATION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(CONJUGATION, path));
 		delete key;
@@ -135,7 +135,7 @@ void Scheme::addLeftRotKey(SecretKey& secretKey, long r) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "serkey/ROTATION_" + to_string(r) + ".txt";
+		string path = "./serkey/ROTATION_" + to_string(r) + ".txt";
 		SerializationUtils::writeKey(key, path);
 		serLeftRotKeyMap.insert(pair<long, string>(r, path));
 		delete key;
@@ -259,6 +259,8 @@ void Scheme::encryptMsg(Ciphertext& cipher, Plaintext& plain) {
 
 	ring.multNTT(cipher.bx, vx, key->rbx, np, qQ);
 	delete[] vx;
+
+	if (isSerialized) delete key;
 
 	ring.addAndEqual(cipher.bx, plain.mx, qQ);
 
@@ -528,6 +530,9 @@ void Scheme::mult(Ciphertext& res, Ciphertext& cipher1, Ciphertext& cipher2) {
 	ring.CRT(raa, axax, np);
 	ring.multDNTT(res.ax, raa, key->rax, np, qQ);
 	ring.multDNTT(res.bx, raa, key->rbx, np, qQ);
+
+	if (isSerialized) delete key;
+
 	ring.rightShiftAndEqual(res.ax, logQ);
 	ring.rightShiftAndEqual(res.bx, logQ);
 
@@ -580,6 +585,8 @@ void Scheme::multAndEqual(Ciphertext& cipher1, Ciphertext& cipher2) {
 	ring.CRT(raa, axax, np);
 	ring.multDNTT(cipher1.ax, raa, key->rax, np, qQ);
 	ring.multDNTT(cipher1.bx, raa, key->rbx, np, qQ);
+
+	if (isSerialized) delete key;
 
 	ring.rightShiftAndEqual(cipher1.ax, logQ);
 	ring.rightShiftAndEqual(cipher1.bx, logQ);
@@ -634,6 +641,8 @@ void Scheme::square(Ciphertext& res, Ciphertext& cipher) {
 	ring.multDNTT(res.ax, raa, key->rax, np, qQ);
 	ring.multDNTT(res.bx, raa, key->rbx, np, qQ);
 
+	if (isSerialized) delete key;
+
 	ring.rightShiftAndEqual(res.ax, logQ);
 	ring.rightShiftAndEqual(res.bx, logQ);
 
@@ -679,6 +688,8 @@ void Scheme::squareAndEqual(Ciphertext& cipher) {
 	ring.CRT(raa, axax, np);
 	ring.multDNTT(cipher.ax, raa, key->rax, np, qQ);
 	ring.multDNTT(cipher.bx, raa, key->rbx, np, qQ);
+
+	if (isSerialized) delete key;
 
 	ring.rightShiftAndEqual(cipher.ax, logQ);
 	ring.rightShiftAndEqual(cipher.bx, logQ);
@@ -941,6 +952,8 @@ void Scheme::leftRotateFast(Ciphertext& res, Ciphertext& cipher, long r) {
 	ring.multDNTT(res.ax, rarot, key->rax, np, qQ);
 	ring.multDNTT(res.bx, rarot, key->rbx, np, qQ);
 
+	if (isSerialized) delete key;
+
 	ring.rightShiftAndEqual(res.ax, logQ);
 	ring.rightShiftAndEqual(res.bx, logQ);
 	ring.addAndEqual(res.bx, bxrot, q);
@@ -964,6 +977,8 @@ void Scheme::leftRotateFastAndEqual(Ciphertext& cipher, long r) {
 	ring.CRT(rarot, axrot, np);
 	ring.multDNTT(cipher.ax, rarot, key->rax, np, qQ);
 	ring.multDNTT(cipher.bx, rarot, key->rbx, np, qQ);
+
+	if (isSerialized) delete key;
 
 	ring.rightShiftAndEqual(cipher.ax, logQ);
 	ring.rightShiftAndEqual(cipher.bx, logQ);
@@ -1003,6 +1018,8 @@ void Scheme::conjugate(Ciphertext& res, Ciphertext& cipher) {
 	ring.multDNTT(res.ax, raconj, key->rax, np, qQ);
 	ring.multDNTT(res.bx, raconj, key->rbx, np, qQ);
 
+	if (isSerialized) delete key;
+
 	ring.rightShiftAndEqual(res.ax, logQ);
 	ring.rightShiftAndEqual(res.bx, logQ);
 	ring.addAndEqual(res.bx, bxconj, q);
@@ -1029,6 +1046,8 @@ void Scheme::conjugateAndEqual(Ciphertext& cipher) {
 	ring.CRT(raconj, axconj, np);
 	ring.multDNTT(cipher.ax, raconj, key->rax, np, qQ);
 	ring.multDNTT(cipher.bx, raconj, key->rbx, np, qQ);
+
+	if (isSerialized) delete key;
 
 	ring.rightShiftAndEqual(cipher.ax, logQ);
 	ring.rightShiftAndEqual(cipher.bx, logQ);

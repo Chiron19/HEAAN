@@ -57,7 +57,7 @@ public:
 
 	void addLeftRotKey(SecretKey& secretKey, long r);
 
-	void addRightRotKey(SecretKey& secretKey, long r);
+	void addRightRotKey(SecretKey& secretKey, long r); 
 
 	void addLeftRotKeys(SecretKey& secretKey);
 

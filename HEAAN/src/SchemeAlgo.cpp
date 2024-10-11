@@ -22,9 +22,11 @@ void SchemeAlgo::powerOf2(Ciphertext& res, Ciphertext& cipher, long logp, long l
 
 void SchemeAlgo::powerOf2Extended(Ciphertext* res, Ciphertext& cipher, long logp, long logDegree) {
 	res[0].copy(cipher);
+	cout << "res[0].logp: " << res[0].logp << ", res[0].logq: " << res[0].logq << endl;
 	for (long i = 1; i < logDegree + 1; ++i) {
 		scheme.square(res[i], res[i-1]);
 		scheme.reScaleByAndEqual(res[i], logp);
+		cout << "res[" << i << "].logp: " << res[i].logp << ", res[" << i << "].logq: " << res[i].logq << endl;
 	}
 }
 
@@ -48,6 +50,8 @@ void SchemeAlgo::power(Ciphertext& res, Ciphertext& cipher, long logp, long degr
 
 void SchemeAlgo::powerExtended(Ciphertext* res, Ciphertext& cipher, long logp, long degree) {
 	long logDegree = log2((double)degree);
+	cout << "logDegree: " << logDegree << endl;
+	cout << "cipher.logp: " << cipher.logp << ", cipher.logq: " << cipher.logq << endl;
 	Ciphertext* cpows = new Ciphertext[logDegree + 1];
 	powerOf2Extended(cpows, cipher, logp, logDegree);
 	long idx = 0;
@@ -97,6 +101,9 @@ void SchemeAlgo::inverse(Ciphertext& res, Ciphertext& cipher, long logp, long st
 //-----------------------------------------
 
 void SchemeAlgo::function(Ciphertext& res, Ciphertext& cipher, string& funcName, long logp, long degree) {
+	// Debugging output
+    cout << "Function called with degree: " << degree << endl;
+	cout << "Ciphertext logp: " << cipher.logp << ", logq: " << cipher.logq << endl;
 	Ciphertext* cpows = new Ciphertext[degree];
 	powerExtended(cpows, cipher, logp, degree);
 
