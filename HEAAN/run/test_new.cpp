@@ -243,62 +243,69 @@ int main(int argc, char **argv) {
     };
 
     Ciphertext cipher_msg;
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.bn1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.bn1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
     
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.2.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.2.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.2.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.2.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
 
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.1.bin");
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.1.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.2.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
 
     cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
-    Ciphertext cipher_temp(cipher_msg);
-    // // cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     // // print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
-    scheme.cipherAvgPoolingAndEqual(cipher_msg, scheme, 8, 64);
-    cout << "layerEnd.avgpool done" << endl;
-    cout << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    print_res_pool(scheme.decrypt(secretKey, cipher_msg));
+    // Ciphertext cipher_temp;
+    // scheme.cipherAvgPoolingAndEqual(cipher_msg, scheme, 8, 64);
+    // cout << "layerEnd.avgpool done" << endl;
+    // cout << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // // print_res_pool(scheme.decrypt(secretKey, cipher_msg));
     
-    cipherLinearLayer_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, 10, "./weights/fc.weight.txt", "./weights/fc.bias.txt");
-    cout << "layerEnd.linear done" << endl;
-    cout << cipher_temp.n << ", " << cipher_temp.logp << ", " << cipher_temp.logq << endl;
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerEnd.avgpool.bin");
-    // cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
+    // cipherLinearLayer_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, 10, "./weights/fc.weight.txt", "./weights/fc.bias.txt");
+    // cout << "layerEnd.linear done" << endl;
+    // cout << cipher_temp.n << ", " << cipher_temp.logp << ", " << cipher_temp.logq << endl;
 
-    std::complex<double>* dec = scheme.decrypt(secretKey, cipher_temp);
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerEnd.avgpool.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
+    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+
+    std::complex<double>* dec = scheme.decrypt(secretKey, cipher_msg);
     print_res_classification(dec);
 	return 0;
 }

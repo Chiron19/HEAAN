@@ -9,12 +9,12 @@ while getopts "rcd" opt; do
             cd ../run
             echo "Rebuilding done (cd to ../run)"
             ;;
-        c)
+        k)
             echo "Cleaning Public Key and Secret Key..."
             rm ./serkey/*
             rm secretKey.bin
             ;;
-        d)
+        c)
             echo "Cleaning Ciphers Saved..."
             rm ./cipher/*
             ;;

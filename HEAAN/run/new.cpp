@@ -117,13 +117,16 @@ std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
 int main(int argc, char **argv) {
     cout << "start" << endl;
     srand(time(NULL));
-    SetNumThreads(8);
+    SetNumThreads(4);
+    
     TimeUtils timeutils;
     Ring ring;
     SecretKey secretKey(ring);
     SerializationUtils_::readSecretKey(secretKey, "secretKey.bin");
     Scheme_ scheme(secretKey, ring, true);
     SerializationUtils_::checkSerialDirectory("./serkey");
+
+    timeutils.start("key generation");
 
     cout << "keymap: ENCRYPTION    : " << scheme.serKeyMap.at(ENCRYPTION) << endl;
     cout << "keymap: MULTIPLICATION: " << scheme.serKeyMap.at(MULTIPLICATION) << endl;
@@ -160,18 +163,12 @@ int main(int argc, char **argv) {
     long n = 1 << logn;
     long slots = n;
 
-    double* img = new double[1024 * 3]; // Dynamically allocate memory for the array
+    double* img = new double[1024 * 3];
     int w, h, c;
     readImage("./luis.png", img, w, h, c);
     print_rep_img(img, static_cast<long>(w));
-    // for (int i = 0; i < 3; i++) {
-    //     for (int j = 0; j < 1024; j++) {
-    //         img[i * 1024 + j] = 0.1; // Assign a random value to each entry
-    //     }
-    // }
 
-
-    complex<double>* mvec1 = new complex<double>[n]; // Dynamically allocate memory for the array
+    complex<double>* mvec1 = new complex<double>[n];
     for (int i = 0; i < n; i++) {
         if (i < 1024 * 3) {
             mvec1[i] = img[i];
@@ -185,95 +182,116 @@ int main(int argc, char **argv) {
     cout << "img prepare to encrypt done" << endl;
 
     std::vector<string> paths = {
-        "./weights/conv1.txt",
-        "./weights/bn1.txt",
-        "./weights/layer1.0.conv1.txt",
-        "./weights/layer1.0.bn1.txt",
-        "./weights/layer1.0.conv2.txt",
-        "./weights/layer1.0.bn2.txt",
-        "./weights/layer1.1.conv1.txt",
-        "./weights/layer1.1.bn1.txt",
-        "./weights/layer1.1.conv2.txt",
-        "./weights/layer1.1.bn2.txt",
-        "./weights/layer1.2.conv1.txt",
-        "./weights/layer1.2.bn1.txt",
-        "./weights/layer1.2.conv2.txt",
-        "./weights/layer1.2.bn2.txt",
-        "./weights/layer2.0.conv1.txt",
-        "./weights/layer2.0.bn1.txt",
-        "./weights/layer2.0.conv2.txt",
-        "./weights/layer2.0.bn2.txt",
-        "./weights/layer2.0.downsample.0.txt",
-        "./weights/layer2.0.downsample.1.txt",
-        "./weights/layer2.1.conv1.txt",
-        "./weights/layer2.1.bn1.txt",
-        "./weights/layer2.1.conv2.txt",
-        "./weights/layer2.1.bn2.txt",
-        "./weights/layer2.2.conv1.txt",
-        "./weights/layer2.2.bn1.txt",
-        "./weights/layer2.2.conv2.txt",
-        "./weights/layer2.2.bn2.txt",
-        "./weights/layer3.0.conv1.txt",
-        "./weights/layer3.0.bn1.txt",
-        "./weights/layer3.0.conv2.txt",
-        "./weights/layer3.0.bn2.txt",
-        "./weights/layer3.0.downsample.0.txt",
-        "./weights/layer3.0.downsample.1.txt",
-        "./weights/layer3.1.conv1.txt",
-        "./weights/layer3.1.bn1.txt",
-        "./weights/layer3.1.conv2.txt",
-        "./weights/layer3.1.bn2.txt",
-        "./weights/layer3.2.conv1.txt",
-        "./weights/layer3.2.bn1.txt",
-        "./weights/layer3.2.conv2.txt",
-        "./weights/layer3.2.bn2.txt",
-        "./weights/layer3.3.conv1.txt",
-        "./weights/layer3.3.bn1.txt",
-        "./weights/layer3.3.conv2.txt",
-        "./weights/layer3.3.bn2.txt",
-        "./weights/fc.weight.txt",
-        "./weights/fc.bias.txt",
+        "../../../FL/weights/conv1.txt",
+        "../../../FL/weights/bn1.txt",
+        "../../../FL/weights/layer1.0.conv1.txt",
+        "../../../FL/weights/layer1.0.bn1.txt",
+        "../../../FL/weights/layer1.0.conv2.txt",
+        "../../../FL/weights/layer1.0.bn2.txt",
+        "../../../FL/weights/layer1.1.conv1.txt",
+        "../../../FL/weights/layer1.1.bn1.txt",
+        "../../../FL/weights/layer1.1.conv2.txt",
+        "../../../FL/weights/layer1.1.bn2.txt",
+        "../../../FL/weights/layer1.2.conv1.txt",
+        "../../../FL/weights/layer1.2.bn1.txt",
+        "../../../FL/weights/layer1.2.conv2.txt",
+        "../../../FL/weights/layer1.2.bn2.txt",
+        "../../../FL/weights/layer2.0.conv1.txt",
+        "../../../FL/weights/layer2.0.bn1.txt",
+        "../../../FL/weights/layer2.0.conv2.txt",
+        "../../../FL/weights/layer2.0.bn2.txt",
+        "../../../FL/weights/layer2.0.downsample.0.txt",
+        "../../../FL/weights/layer2.0.downsample.1.txt",
+        "../../../FL/weights/layer2.1.conv1.txt",
+        "../../../FL/weights/layer2.1.bn1.txt",
+        "../../../FL/weights/layer2.1.conv2.txt",
+        "../../../FL/weights/layer2.1.bn2.txt",
+        "../../../FL/weights/layer2.2.conv1.txt",
+        "../../../FL/weights/layer2.2.bn1.txt",
+        "../../../FL/weights/layer2.2.conv2.txt",
+        "../../../FL/weights/layer2.2.bn2.txt",
+        "../../../FL/weights/layer3.0.conv1.txt",
+        "../../../FL/weights/layer3.0.bn1.txt",
+        "../../../FL/weights/layer3.0.conv2.txt",
+        "../../../FL/weights/layer3.0.bn2.txt",
+        "../../../FL/weights/layer3.0.downsample.0.txt",
+        "../../../FL/weights/layer3.0.downsample.1.txt",
+        "../../../FL/weights/layer3.1.conv1.txt",
+        "../../../FL/weights/layer3.1.bn1.txt",
+        "../../../FL/weights/layer3.1.conv2.txt",
+        "../../../FL/weights/layer3.1.bn2.txt",
+        "../../../FL/weights/layer3.2.conv1.txt",
+        "../../../FL/weights/layer3.2.bn1.txt",
+        "../../../FL/weights/layer3.2.conv2.txt",
+        "../../../FL/weights/layer3.2.bn2.txt",
+        "../../../FL/weights/layer3.3.conv1.txt",
+        "../../../FL/weights/layer3.3.bn1.txt",
+        "../../../FL/weights/layer3.3.conv2.txt",
+        "../../../FL/weights/layer3.3.bn2.txt",
+        "../../../FL/weights/fc.weight.txt",
+        "../../../FL/weights/fc.bias.txt",
     };
     
     Ciphertext cipher_msg;
     scheme.encrypt(cipher_msg, mvec1, n, logp, logq);
     print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
     cout << "encrypt done" << endl;
+
+    timeutils.stop("encrypt");
+
+    timeutils.start("forward");
+
+    numThreads = 8;
     
     Ciphertext cipher_res;
     Ciphertext cipher_temp;
 
+    timeutils.start("layerInit");
     if (!SerializationUtils_::checkFile("./cipher/layerInit.relu1.bin")) {
         layerInit(cipher_res, cipher_msg, scheme, paths);
     }
-    
-    
+    timeutils.stop("layerInit");
+
+    timeutils.start("layer1");
     if (!SerializationUtils_::checkFile("./cipher/layer1.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
         print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
         layer1(cipher_res, cipher_temp, scheme, paths);
     }
+    timeutils.stop("layer1");
 
+    numThreads = 8;
+
+    timeutils.start("layer2");
     if (!SerializationUtils_::checkFile("./cipher/layer2.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
         print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
         layer2(cipher_res, cipher_temp, scheme, paths);
     }
+    timeutils.stop("layer2");
 
+    numThreads = 16;
+
+    timeutils.start("layer3");
     if (!SerializationUtils_::checkFile("./cipher/layer3.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
         print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
         layer3(cipher_res, cipher_temp, scheme, paths);
     }
+    timeutils.stop("layer3");
 
+    timeutils.start("layerEnd");
     if (!SerializationUtils_::checkFile("./cipher/layerEnd.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
         print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
         layerEnd(cipher_res, cipher_temp, scheme, paths);
     }
-    
+    timeutils.stop("layerEnd");
+
+    timeutils.start("decrypt");
     complex<double>* dec0 = scheme.decrypt(secretKey, cipher_res);
     print_res_classification(dec0);
+    timeutils.stop("decrypt");
 
     delete[] dec0;
     delete[] mvec1;

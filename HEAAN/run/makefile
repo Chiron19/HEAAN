@@ -1,9 +1,16 @@
 # This sample should be run after make libHEAAN.a file in lib folder
 
 # All Target
-all: clean TestImage TestNumber TestImageMultibatches conv conv_layer test_new new
+all: clean test TestImage TestNumber TestImageMultibatches conv conv_layer test_new new
 
 # Tool invocations
+test:	
+	@echo 'Building target: $@'
+	@echo 'Invoking: GCC C++ Linker'
+	g++ test.cpp -o TestHEAAN -L/usr/local/lib ../lib/libHEAAN.a -lntl -lgmp -lm -std=c++11 -O2 -I/../src -pthread
+	@echo 'Finished building target: $@'
+	@echo ' '
+
 TestImage:	
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
@@ -52,13 +59,13 @@ test_new:
 new:
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -fsanitize=address new.cpp -o new -L/usr/local/lib ../lib/libHEAAN.a -march=native -lntl -lgmp -lm -std=c++11 -O2 -I/../src -pthread
+	g++ new.cpp -o new -L/usr/local/lib ../lib/libHEAAN.a -march=native -lntl -lgmp -lm -std=c++11 -O3 -I/../src -pthread
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	rm -rf Test* conv conv_layer test_new new
+	rm -rf test Test* conv conv_layer test_new new
 
 repeat:
 	@for i in $$(seq 0 99); do \

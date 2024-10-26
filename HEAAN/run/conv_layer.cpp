@@ -54,13 +54,13 @@ void print_diagonal_packing(complex<double>* mvec, long row, long col, long prec
     cout << endl;
 }
 
-Ciphertext cipher_conv_3x3(Ciphertext& cipher_msg, double* kernal, Scheme scheme, long row, long col, long n, long logp, long logq) {
+Ciphertext cipher_conv_3x3(Ciphertext& cipher_msg, double* kernel, Scheme scheme, long row, long col, long n, long logp, long logq) {
     Ciphertext cipher[9];
     Ciphertext cipher_rot[2];
     complex<double>** mvec = new complex<double>*[9]; // Dynamically allocate memory for the array
     for (long i = 0; i < 9; i++) {
         mvec[i] = new complex<double>[n];
-        diagonal_packing_single_value(mvec[i], kernal[i], row, col, n);
+        diagonal_packing_single_value(mvec[i], kernel[i], row, col, n);
         scheme.encrypt(cipher[i], mvec[i], n, logp, logq);
     }
     scheme.multAndEqual(cipher[4], cipher_msg);
@@ -111,13 +111,13 @@ Ciphertext cipher_conv_3x3(Ciphertext& cipher_msg, double* kernal, Scheme scheme
     return cipher[0];
 }
 
-void cipher_resample(Ciphertext& cipher_msg, long channel_in, long channel_out, double* kernal, Scheme scheme, long row, long col, long n, long logp, long logq) {
+void cipher_resample(Ciphertext& cipher_msg, long channel_in, long channel_out, double* kernel, Scheme scheme, long row, long col, long n, long logp, long logq) {
     Ciphertext cipher_res;
     Ciphertext cipher_rot[2];
     complex<double>** mvec = new complex<double>*[9]; // Dynamically allocate memory for the array
     for (long i = 0; i < 9; i++) {
         mvec[i] = new complex<double>[n];
-        diagonal_packing_single_value(mvec[i], kernal[i], row, col, n);
+        diagonal_packing_single_value(mvec[i], kernel[i], row, col, n);
         scheme.encrypt(cipher[i], mvec[i], n, logp, logq);
     }
 }

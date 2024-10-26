@@ -4,11 +4,14 @@
 #include <NTL/ZZ.h>
 #include <string>
 #include <iomanip>
+#include <pthread.h>
 
 using namespace std;
 using namespace NTL;
 
 namespace heaan {
+
+static long numThreads = 1;
 
 class Scheme_: public Scheme {
 public:
@@ -16,50 +19,126 @@ public:
 Scheme_(SecretKey& secretKey, Ring& ring, bool isSerialized = false) 
 : Scheme(secretKey, ring, isSerialized) {}
 
-void packKernal(complex<double>** mvec, double** kernal, long w, long c);
+void packKernelConst(complex<double>* mvec, double* kernel, long w, long c);
+void packKernel(complex<double>** mvec, double** kernel, long w, long c);
 void packConst(complex<double>* mvec, long n, double* const_vec, long w, long c);
 void packWeights(complex<double>* mvec, long n, double* weights, long w, long c);
 void maskSlot(complex<double>* mvec, long n, long w, long c_start_id);
-void cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** kernal, Scheme& scheme, long w, long c);
-void cipherChannelSumAndEqual(Ciphertext& cipher, Scheme& scheme, long w, long c, long c_target_id);
-void cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme& scheme, long w, long c, long c_target_id);
-void cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in, long c_out);
-void cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in, long c_out);
-void cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in);
-void cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c);
-void cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c);
-void cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c);
-void cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c);
-void cipherBatchNormLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c, double* gamma, double* beta);
-void cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme& scheme, long w, long c, double* gamma, double* beta);
-void cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme& scheme);
-void cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme& scheme, long w, long c);
-void cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme& scheme, long w, long c_in, long c_out);
+void cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** kernel, Scheme_ &scheme, long w, long c);
+void cipherConv1x1(Ciphertext& cipher_res, Ciphertext& cipher_msg, double* kernel, Scheme_ &scheme, long w, long c);
+void cipherChannelSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id);
+void cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id);
+void cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out);
+void cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out);
+void cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in);
+void cipherConv2d1x1LayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double** kernels, Scheme_ &scheme, long w, long c_in);
+void cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
+void cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
+void cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
+void cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
+void cipherBatchNormLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
+void cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
+void cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme);
+void cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
+void cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme_ &scheme, long w, long c_in, long c_out);
 
 };
 
+struct ThreadData {
+    Ciphertext* cipher_conv;
+    Ciphertext* cipher_msg;
+    double*** kernels;
+    Scheme_* scheme;
+    long w;
+    long c_in;
+    long kernel_index_start;
+    long kernel_index_end;
+    long cipher_index_start;
+};
+
+// Thread function to perform convolution and channel sum
+static void* threadFunc_cipherConv2dLayer(void* arg) {
+    ThreadData* data = (ThreadData*)arg;
+    for (long i = data->kernel_index_start, j = data->cipher_index_start; i < data->kernel_index_end; i++, j++) {
+        // cout << "convolution channel_out " << i << " start" << endl;
+        data->scheme->cipherConv3x3(data->cipher_conv[j], *data->cipher_msg, data->kernels[i], *data->scheme, data->w, data->c_in);
+        // cout << "convolution channel_out " << i << " done" << endl;
+        data->scheme->cipherChannelSumAndEqual(data->cipher_conv[j], *data->scheme, data->w, data->c_in, j);
+        // cout << "channel sum channel_out " << i << " done" << endl;
+    }
+    return nullptr;
+}
+
+// Thread function to perform convolution and channel sum
+static void* threadFunc_cipherConv2d1x1Layer(void* arg) {
+    ThreadData* data = (ThreadData*)arg;
+    for (long i = data->kernel_index_start, j = data->cipher_index_start; i < data->kernel_index_end; i++, j++) {
+        // cout << "convolution channel_out " << i << " start" << endl;
+        data->scheme->cipherConv1x1(data->cipher_conv[j], *data->cipher_msg, data->kernels[0][i], *data->scheme, data->w, data->c_in);
+        // cout << "convolution channel_out " << i << " done" << endl;
+        data->scheme->cipherChannelSumAndEqual(data->cipher_conv[j], *data->scheme, data->w, data->c_in, j);
+        // cout << "channel sum channel_out " << i << " done" << endl;
+    }
+    return nullptr;
+}
+
+// Thread function to perform convolution and channel sum
+static void* threadFunc_cipherConv2dLayerFast(void* arg) {
+    ThreadData* data = (ThreadData*)arg;
+    for (long i = data->kernel_index_start, j = data->cipher_index_start; i < data->kernel_index_end; i++, j++) {
+        // cout << "convolution channel_out " << i << " start" << endl;
+        data->scheme->cipherConv3x3(data->cipher_conv[j], *data->cipher_msg, data->kernels[i], *data->scheme, data->w, data->c_in);
+        // cout << "convolution channel_out " << i << " done" << endl;
+        data->scheme->cipherChannelFastSumAndEqual(data->cipher_conv[j], *data->scheme, data->w, data->c_in, j);
+        // cout << "channel sum channel_out " << i << " done" << endl;
+    }
+    return nullptr;
+}
+
 /**
- * @brief Pack `kernel[c][9]`: 3x3 kernals of `c` channels to `mvec`
+ * @brief Pack `kernel[c]`: kernel of `c` channels to `mvec`, each channel `i` is filled with `kernel[i]`
  * 
  * @param mvec 
- * @param kernal 
+ * @param kernel 
  * @param w 
  * @param c 
  */
-void Scheme_::packKernal(complex<double>** mvec, double** kernal, long w, long c) {
+void Scheme_::packKernelConst(complex<double>* mvec, double* kernel, long w, long c) {
+    int ii = 0;
+    for (long i = 0; i < c; i++) {
+        for (long j = 0; j < w; j++) {
+            for (long k = 0; k < w; k++) {
+                mvec[ii++] = kernel[i];
+            }
+        }
+    }
+    for (int i = c * w * w; i < n; i++) {
+        mvec[i] = 0;
+    }
+}
+
+/**
+ * @brief Pack `kernel[c][9]`: 3x3 kernels of `c` channels to `mvec`
+ * 
+ * @param mvec 
+ * @param kernel 
+ * @param w 
+ * @param c 
+ */
+void Scheme_::packKernel(complex<double>** mvec, double** kernel, long w, long c) {
     for (long i = 0; i < c; i++) {
         for (long j = 0; j < w; j++) {
             for (long k = 0; k < w; k++) {
                 int ii = i * w * w + j * w + k;
-                mvec[0][ii] = (j == 0 || k == 0) ? 0 : kernal[i][0];
-                mvec[1][ii] = (j == 0) ? 0 : kernal[i][1];
-                mvec[2][ii] = (j == 0 || k == w - 1) ? 0 : kernal[i][2];
-                mvec[3][ii] = (k == 0) ? 0 : kernal[i][3];
-                mvec[4][ii] = kernal[i][4];
-                mvec[5][ii] = (k == w - 1) ? 0 : kernal[i][5];
-                mvec[6][ii] = (j == w - 1 || k == 0) ? 0 : kernal[i][6];
-                mvec[7][ii] = (j == w - 1) ? 0 : kernal[i][7];
-                mvec[8][ii] = (j == w - 1 || k == w - 1) ? 0 : kernal[i][8];
+                mvec[0][ii] = (j == 0 || k == 0) ? 0 : kernel[i][0];
+                mvec[1][ii] = (j == 0) ? 0 : kernel[i][1];
+                mvec[2][ii] = (j == 0 || k == w - 1) ? 0 : kernel[i][2];
+                mvec[3][ii] = (k == 0) ? 0 : kernel[i][3];
+                mvec[4][ii] = kernel[i][4];
+                mvec[5][ii] = (k == w - 1) ? 0 : kernel[i][5];
+                mvec[6][ii] = (j == w - 1 || k == 0) ? 0 : kernel[i][6];
+                mvec[7][ii] = (j == w - 1) ? 0 : kernel[i][7];
+                mvec[8][ii] = (j == w - 1 || k == w - 1) ? 0 : kernel[i][8];
             }
         }
     }
@@ -118,11 +197,36 @@ void Scheme_::maskSlot(complex<double>* mvec, long n, long w, long c_start_id) {
 }
 
 /**
- * @brief Convolution operation with 3x3 kernal (padding (1, 1)) of c channels, image size w * w
+ * @brief Convolution operation with 1x1 kernel of c channels, image size w * w
  * 
  * @param cipher_res 
  * @param cipher_msg 
- * @param kernal 2d pointer to [c][9] 3x3 kernals of c channels
+ * @param kernel 1d pointer to [c] 1x1 kernels of c channels
+ * @param scheme 
+ * @param w 
+ * @param c 
+ */
+void Scheme_::cipherConv1x1(Ciphertext& cipher_res, Ciphertext& cipher_msg, double* kernel, Scheme_ &scheme, long w, long c) {
+    long n = cipher_msg.n;
+    long logp = cipher_msg.logp;
+    long logq = cipher_msg.logq;
+
+    complex<double>* mvec = new complex<double>[n];
+    packKernelConst(mvec, kernel, w, c);
+   
+    cipher_res.copyParams(cipher_msg);
+    scheme.multByConstVec(cipher_res, cipher_msg, mvec, logp);
+    scheme.reScaleByAndEqual(cipher_res, logp);
+
+    delete[] mvec;
+}
+
+/**
+ * @brief Convolution operation with 3x3 kernel (padding (1, 1)) of c channels, image size w * w
+ * 
+ * @param cipher_res 
+ * @param cipher_msg 
+ * @param kernel 2d pointer to [c][9] 3x3 kernels of c channels
  * @param scheme 
  * @param w
  * @param c 
@@ -131,7 +235,7 @@ void Scheme_::maskSlot(complex<double>* mvec, long n, long w, long c_start_id) {
  * LeftRotKey: 1, w
  * RightRotKey: 1, w
  */
-void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** kernal, Scheme& scheme, long w, long c) {
+void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** kernel, Scheme_ &scheme, long w, long c) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
@@ -147,7 +251,7 @@ void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, doub
     for (long i = 0; i < 9; i++) {
         mvec[i] = new complex<double>[n];
     }
-    packKernal(mvec, kernal, w, c);
+    packKernel(mvec, kernel, w, c);
    
     scheme.multByConstVec(cipher[4], cipher_rot[0], mvec[4], logp);
 
@@ -186,7 +290,7 @@ void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, doub
 
     cipher_res.copy(cipher[0]);
     scheme.reScaleByAndEqual(cipher_res, logp);
-    cout << "cipherConv3x3 end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "cipherConv3x3 end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
 
     for (int i = 0; i < 9; i++) {
         delete[] mvec[i];
@@ -200,7 +304,7 @@ void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, doub
     }
     delete[] cipher_rot;
     delete[] cipher;
-    cout << "convolution end" << endl;
+    // cout << "convolution end" << endl;
 }
 
 /**
@@ -217,8 +321,8 @@ void Scheme_::cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, doub
  * RightRotKey: w * w
  * 
  */
-void Scheme_::cipherChannelSumAndEqual(Ciphertext& cipher, Scheme& scheme, long w, long c, long c_target_id) {
-    cout << "channel sum start" << endl;
+void Scheme_::cipherChannelSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id) {
+    // cout << "channel sum start" << endl;
     long n = cipher.n;
     long logp = cipher.logp;
     long logq = cipher.logq;
@@ -228,9 +332,9 @@ void Scheme_::cipherChannelSumAndEqual(Ciphertext& cipher, Scheme& scheme, long 
     }
     for (long i = 1; i < c; i++) {
         scheme.leftRotateFastAndEqual(cipher_rot, w * w);
-        cout << "channel sum rotate " << i << " done" << endl;
+        // cout << "channel sum rotate " << i << " done" << endl;
         scheme.addAndEqual(cipher, cipher_rot);
-        cout << "channel sum add " << i << " done" << endl;
+        // cout << "channel sum add " << i << " done" << endl;
     }
     complex<double>* mvec = new complex<double>[n];
     maskSlot(mvec, n, w, c_target_id);
@@ -238,7 +342,7 @@ void Scheme_::cipherChannelSumAndEqual(Ciphertext& cipher, Scheme& scheme, long 
     scheme.reScaleByAndEqual(cipher, logp);
     cipher_rot.free();
     delete[] mvec;
-    cout << "channel sum end" << endl;
+    // cout << "channel sum end" << endl;
 }
 
 /**
@@ -255,8 +359,8 @@ void Scheme_::cipherChannelSumAndEqual(Ciphertext& cipher, Scheme& scheme, long 
  * RightRotKey: c_target_id * w * w
  * 
  */
-void Scheme_::cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme& scheme, long w, long c, long c_target_id) {
-    cout << "channel sum start" << endl;
+void Scheme_::cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id) {
+    // cout << "channel sum start" << endl;
     long n = cipher.n;
     long logp = cipher.logp;
     long logq = cipher.logq;
@@ -267,9 +371,9 @@ void Scheme_::cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme& scheme, l
     }
     for (long i = c / 2; i > 0; i /= 2) {
         scheme.leftRotateFast(cipher_temp, cipher_rot, i * w * w);
-        cout << "channel sum rotate " << i << " done" << endl;
+        // cout << "channel sum rotate " << i << " done" << endl;
         scheme.addAndEqual(cipher_rot, cipher_temp);
-        cout << "channel sum add " << i << " done" << endl;
+        // cout << "channel sum add " << i << " done" << endl;
     }
     complex<double>* mvec = new complex<double>[n];
     maskSlot(mvec, n, w, c_target_id);
@@ -278,15 +382,15 @@ void Scheme_::cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme& scheme, l
     cipher_rot.free();
     cipher_temp.free();
     delete[] mvec;
-    cout << "channel sum end" << endl;
+    // cout << "channel sum end" << endl;
 }
 
 /**
- * @brief Convolution Layer with 3x3 kernal (padding (1, 1)) of c channels, image size w * w
+ * @brief Convolution Layer with 3x3 kernel (padding (1, 1)) of c channels, image size w * w
  * 
  * @param cipher_res 
  * @param cipher_msg 
- * @param kernals 3d pointer to [c_out][c_in][9] 3x3 kernals
+ * @param kernels 3d pointer to [c_out][c_in][9] 3x3 kernels
  * @param scheme 
  * @param w 
  * @param c_in 
@@ -299,38 +403,52 @@ void Scheme_::cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme& scheme, l
  * RightRotKey: 1, w, w * w
  * 
  */
-void Scheme_::cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in, long c_out) {
-    cout << "convolution start (LeftRotKey:" << 1 << ", " << w << ", " << w * w << ", RightRotKey:" << 1 << ", " << w << ", " << w * w << ")" << endl;
+void Scheme_::cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out) {
+    // cout << "convolution start (LeftRotKey:" << 1 << ", " << w << ", " << w * w << ", RightRotKey:" << 1 << ", " << w << ", " << w * w << ")" << endl;
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
-    cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    Ciphertext cipher_conv;
-    for (long i = 0; i < c_out; i++)
-    {
-        cipherConv3x3(cipher_conv, cipher_msg, kernals[i], scheme, w, c_in);
-        cout << "convolution channel_out " << i << " done" << endl;
-        cipherChannelSumAndEqual(cipher_conv, scheme, w, c_in, i);
-        cout << "channel sum channel_out " << i << " done" << endl;
+    // cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    Ciphertext* cipher_conv = new Ciphertext[c_out];
+    
+    pthread_t threads[numThreads]; // Array to hold thread identifiers
+    ThreadData threadData[numThreads]; // Array to hold thread data
+
+    for (long i = 0; i < numThreads; i++) {
+        long kernel_index_start = i * c_out / numThreads;
+        long kernel_index_end = (i == numThreads - 1) ? c_out : (i + 1) * c_out / numThreads;
+        threadData[i] = {cipher_conv, &cipher_msg, kernels, &scheme, w, c_in, kernel_index_start, kernel_index_end, kernel_index_start}; // Initialize thread data
+        pthread_create(&threads[i], nullptr, threadFunc_cipherConv2dLayer, (void*)&threadData[i]); // Create thread
+    }
+
+    for (long i = 0; i < numThreads; i++) {
+        pthread_join(threads[i], nullptr); // Wait for all threads to finish
+        // cout << "thread " << i << " done" << endl;
+    }
+
+    for (long i = 0; i < c_out; i++) {
         if (i == 0) {
-            cipher_res.copy(cipher_conv);
+            cipher_res.copy(cipher_conv[i]);
         } else {
-            scheme.addAndEqual(cipher_res, cipher_conv);
+            scheme.addAndEqual(cipher_res, cipher_conv[i]);
         }
-        cout << "add channel_out " << i << " done" << endl;
+        // cout << "add channel_out " << i << " done" << endl;
     }
     
-    cipher_conv.free();
-    cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
-    cout << "convolution end" << endl;
+    for (long i = 0; i < c_out; i++) {
+        cipher_conv[i].free();
+    }
+    delete[] cipher_conv;
+    // cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "convolution end" << endl;
 }
 
 /**
- * @brief Convolution Layer with 3x3 kernal (padding (1, 1)) of c channels, image size w * w
+ * @brief Convolution Layer with 3x3 kernel (padding (1, 1)) of c channels, image size w * w
  * 
  * @param cipher_res 
  * @param cipher_msg 
- * @param kernals 3d pointer to [c_out][c_in][9] 3x3 kernals
+ * @param kernels 3d pointer to [c_out][c_in][9] 3x3 kernels
  * @param scheme 
  * @param w 
  * @param c_in 
@@ -343,48 +461,53 @@ void Scheme_::cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, 
  * RightRotKey: 1, w, {1, ..., c_out - 1} * w * w
  * 
  */
-void Scheme_::cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in, long c_out) {
-    cout << "convolution start (LeftRotKey:" <<  1 << ", " << w << ", ";
-    for (long i = 1; i <= c_in / 2 ; i *= 2)
-    {
-        cout << i * w * w << ", ";
-    }
-    cout << " RightRotKey:" << 1 << ", " << w << ", ";
-    for (long i = 1; i < c_out; i++)
-    {
-        cout << i * w * w << ", ";
-    }
-    cout << ")" << endl;
+void Scheme_::cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
-    cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    Ciphertext cipher_conv;
-    for (long i = 0; i < c_out; i++)
-    {
-        cipherConv3x3(cipher_conv, cipher_msg, kernals[i], scheme, w, c_in);
-        cout << "convolution channel_out " << i << " done" << endl;
-        cipherChannelFastSumAndEqual(cipher_conv, scheme, w, c_in, i);
-        cout << "channel sum channel_out " << i << " done" << endl;
-        if (i == 0) {
-            cipher_res.copy(cipher_conv);
-        } else {
-            scheme.addAndEqual(cipher_res, cipher_conv);
-        }
-        cout << "add channel_out " << i << " done" << endl;
+    // cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    Ciphertext* cipher_conv = new Ciphertext[c_out];
+    
+    pthread_t threads[numThreads]; // Array to hold thread identifiers
+    ThreadData threadData[numThreads]; // Array to hold thread data
+
+    for (long i = 0; i < numThreads; i++) {
+        long kernel_index_start = i * c_out / numThreads;
+        long kernel_index_end = (i == numThreads - 1) ? c_out : (i + 1) * c_out / numThreads;
+        threadData[i] = {cipher_conv, &cipher_msg, kernels, &scheme, w, c_in, kernel_index_start, kernel_index_end, kernel_index_start}; // Initialize thread data
+        pthread_create(&threads[i], nullptr, threadFunc_cipherConv2dLayerFast, (void*)&threadData[i]); // Create thread
+    }
+
+    for (long i = 0; i < numThreads; i++) {
+        pthread_join(threads[i], nullptr); // Wait for all threads to finish
+        // cout << "thread " << i << " done" << endl;
     }
     
-    cipher_conv.free();
-    cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
-    cout << "convolution end" << endl;
+    for (long i = 0; i < c_out; i++) {
+        if (i == 0) {
+            cipher_res.copy(cipher_conv[i]);
+        } else {
+            scheme.addAndEqual(cipher_res, cipher_conv[i]);
+        }
+        // cout << "add channel_out " << i << " done" << endl;
+    }
+
+    for (long i = 0; i < c_out; i++)
+    {
+        cipher_conv[i].free();
+    }
+    delete[] cipher_conv;
+    
+    // cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "convolution end" << endl;
 }
 
 /**
- * @brief Convolution Downsampling Layer with 3x3 kernal (padding (1, 1), stride (2, 2)) of c_in channels, image size w * w to (w / 2) * (w / 2)
+ * @brief Convolution Downsampling Layer with 3x3 kernel (padding (1, 1), stride (2, 2)) of c_in channels, image size w * w to (w / 2) * (w / 2)
  * 
  * @param cipher_res 
  * @param cipher_msg 
- * @param kernals 3d pointer to [c_out=c_in*2][c_in][9] 3x3 kernals
+ * @param kernels 3d pointer to [c_out=c_in*2][c_in][9] 3x3 kernels
  * @param scheme 
  * @param w 
  * @param c_in 
@@ -396,41 +519,108 @@ void Scheme_::cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_m
  * RightRotKey: 1, w, {1, ..., c_out - 1} * w * w / 4, w / 2
  * 
  */
-void Scheme_::cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernals, Scheme &scheme, long w, long c_in) {
-    cout << "convolution downsampling start " << endl;
+void Scheme_::cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
-    cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    Ciphertext cipher_conv;
-    Ciphertext* cipher_ds = new Ciphertext[2];
-    for (long j = 0; j < 2; j++)
-    {
-        for (long i = 0; i < c_in; i++)
-        {
-            cipherConv3x3(cipher_conv, cipher_msg, kernals[j * c_in + i], scheme, w, c_in);
-            cout << "convolution channel_out " << i << " done" << endl;
-            cipherChannelFastSumAndEqual(cipher_conv, scheme, w, c_in, i);
-            cout << "channel sum channel_out " << i << " done" << endl;
-            if (i == 0) {
-                cipher_res.copy(cipher_conv);
-            } else {
-                scheme.addAndEqual(cipher_res, cipher_conv);
-            }
-            cout << "add channel_out " << i << " done" << endl;
-        }
-        cipherDownsampling(cipher_ds[j], cipher_res, scheme, w, c_in);
+    long c_out = c_in * 2;
+    Ciphertext* cipher_conv = new Ciphertext[c_out];
+    Ciphertext cipher_ds;
+
+    cipherDownsampling(cipher_ds, cipher_msg, scheme, w, c_in);
+
+    pthread_t threads[numThreads]; // Array to hold thread identifiers
+    ThreadData threadData[numThreads]; // Array to hold thread data
+
+    for (long i = 0; i < numThreads; i++) {
+        long kernel_index_start = i * c_out / numThreads;
+        long kernel_index_end = (i == numThreads - 1) ? c_out : (i + 1) * c_out / numThreads;
+        long cipher_index_start = i * c_out / numThreads;
+        threadData[i] = {cipher_conv, &cipher_ds, kernels, &scheme, w / 2, c_in, kernel_index_start, kernel_index_end, cipher_index_start}; // Initialize thread data
+        pthread_create(&threads[i], nullptr, threadFunc_cipherConv2dLayerFast, (void*)&threadData[i]); // Create thread
     }
+
+    for (long i = 0; i < numThreads; i++) {
+        pthread_join(threads[i], nullptr); // Wait for all threads to finish
+        // cout << "thread " << i << " done" << endl;
+    }
+
+    for (long i = 0; i < c_in; i++) {
+        if (i == 0) {
+            cipher_res.copy(cipher_conv[i]);
+        } else {
+            scheme.addAndEqual(cipher_res, cipher_conv[i]);
+        }
+        // cout << "add channel_out " << i << " done" << endl;
+    }
+
+        
+    for (long i = 0; i < c_in; i++) {
+        cipher_conv[i].free();
+    } 
+    cipher_ds.free(); 
+    delete[] cipher_conv;
+    // cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "convolution downsampling end" << endl;
+}
+
+/**
+ * @brief Convolution Downsampling Layer with 1x1 kernel of c_in channels, image size w * w to (w / 2) * (w / 2)
+ * 
+ * @param cipher_res 
+ * @param cipher_msg 
+ * @param kernels 2d pointer to [c_out=c_in*2][c_in] 1x1 kernels
+ * @param scheme 
+ * @param w 
+ * @param c_in 
+ * 
+ */
+void Scheme_::cipherConv2d1x1LayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double** kernels, Scheme_ &scheme, long w, long c_in) {
+    // cout << "convolution downsampling start " << endl;
+    long n = cipher_msg.n;
+    long logp = cipher_msg.logp;
+    long logq = cipher_msg.logq;
+    // cout << "cipherConv2dLayer start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    long c_out = c_in * 2;
+    Ciphertext* cipher_conv = new Ciphertext[c_out];
+    Ciphertext cipher_ds;
+    double*** kernel_wrapper = new double**[1];
+    kernel_wrapper[0] = kernels;
+
+    cipherDownsampling(cipher_ds, cipher_msg, scheme, w, c_in);
     
-    cipher_res.copy(cipher_ds[0]);
-    scheme.rightRotateFastAndEqual(cipher_ds[1], c_in * w * w / 4);
-    scheme.addAndEqual(cipher_res, cipher_ds[1]);
-    
-    cipher_ds[0].free();
-    cipher_ds[1].free();    
-    cipher_conv.free();
-    cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
-    cout << "convolution downsampling end" << endl;
+    pthread_t threads[numThreads]; // Array to hold thread identifiers
+    ThreadData threadData[numThreads]; // Array to hold thread data
+
+    for (long i = 0; i < numThreads; i++) {
+        long kernel_index_start = i * c_out / numThreads;
+        long kernel_index_end = (i == numThreads - 1) ? c_out : (i + 1) * c_out / numThreads;
+        long cipher_index_start = i * c_out / numThreads;
+        threadData[i] = {cipher_conv, &cipher_ds, kernel_wrapper, &scheme, w / 2, c_in, kernel_index_start, kernel_index_end, cipher_index_start}; // Initialize thread data
+        pthread_create(&threads[i], nullptr, threadFunc_cipherConv2d1x1Layer, (void*)&threadData[i]); // Create thread
+    }
+
+    for (long i = 0; i < numThreads; i++) {
+        pthread_join(threads[i], nullptr); // Wait for all threads to finish
+        // cout << "thread " << i << " done" << endl;
+    }
+
+    for (long i = 0; i < c_out; i++) {
+        if (i == 0) {
+            cipher_res.copy(cipher_conv[i]);
+        } else {
+            scheme.addAndEqual(cipher_res, cipher_conv[i]);
+        }
+        // cout << "add channel_out " << i << " done" << endl;
+    }
+
+    for (long i = 0; i < c_out; i++) {
+        cipher_conv[i].free();
+    } 
+    cipher_ds.free();   
+    delete[] cipher_conv;
+    // cout << "cipherConv2dLayer end: " << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "convolution downsampling end" << endl;
 }
 
 /**
@@ -446,7 +636,7 @@ void Scheme_::cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Cipherte
  * LeftRotKey: 1
  * RightRotKey: 1
  */
-void Scheme_::cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c) {
+void Scheme_::cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
@@ -464,14 +654,14 @@ void Scheme_::cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_m
     scheme.encrypt(cipher_mask, mask, n, logp, logq);
     Ciphertext cipher_temp;
     scheme.mult(cipher_res, cipher_mask, cipher_rot);
-    cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
+    // cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
     for (int i = 1; i < w / 2; i++) {
         scheme.leftRotateFastAndEqual(cipher_rot, 1);
         scheme.rightRotateFastAndEqual(cipher_mask, 1);
         scheme.mult(cipher_temp, cipher_mask, cipher_rot);
         scheme.addAndEqual(cipher_res, cipher_temp);
-        cout << cipher_res.logp << ", " << cipher_res.logq << endl;
-        cout << "downsampling row add " << i << " done" << endl;
+        // cout << cipher_res.logp << ", " << cipher_res.logq << endl;
+        // cout << "downsampling row add " << i << " done" << endl;
     }
 
     scheme.reScaleByAndEqual(cipher_res, logp);
@@ -496,7 +686,7 @@ void Scheme_::cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_m
  * RightRotKey: w / 2
  * 
  */
-void Scheme_::cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c) {
+void Scheme_::cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
@@ -514,14 +704,14 @@ void Scheme_::cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& ciphe
     scheme.encrypt(cipher_mask, mask, n, logp, logq);
     Ciphertext cipher_temp;
     scheme.mult(cipher_res, cipher_mask, cipher_rot);
-    cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
+    // cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
     for (int i = 1; i < w / 2; i++) {
         scheme.leftRotateFastAndEqual(cipher_rot, 3 * w / 2);
         scheme.rightRotateFastAndEqual(cipher_mask, w / 2);
         scheme.mult(cipher_temp, cipher_mask, cipher_rot);
         scheme.addAndEqual(cipher_res, cipher_temp);
-        cout << cipher_res.logp << ", " << cipher_res.logq << endl;
-        cout << "downsampling column add " << i << " done" << endl;
+        // cout << cipher_res.logp << ", " << cipher_res.logq << endl;
+        // cout << "downsampling column add " << i << " done" << endl;
     }
     scheme.reScaleByAndEqual(cipher_res, logp);
     delete[] mask;
@@ -544,7 +734,7 @@ void Scheme_::cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& ciphe
  * RightRotKey: w * w / 4
  * 
  */
-void Scheme_::cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c) {
+void Scheme_::cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
@@ -562,14 +752,14 @@ void Scheme_::cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& ciph
     scheme.encrypt(cipher_mask, mask, n, logp, logq);
     Ciphertext cipher_temp;
     scheme.mult(cipher_res, cipher_mask, cipher_rot);
-    cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
+    // cout << cipher_rot.logp << ", " << cipher_rot.logq << endl;
     for (int i = 1; i < c; i++) {
         scheme.leftRotateFastAndEqual(cipher_rot, 3 * w * w / 4);
         scheme.rightRotateFastAndEqual(cipher_mask, w * w / 4);
         scheme.mult(cipher_temp, cipher_mask, cipher_rot);
         scheme.addAndEqual(cipher_res, cipher_temp);
-        cout << cipher_res.logp << ", " << cipher_res.logq << endl;
-        cout << "downsampling channel add " << i << " done" << endl;
+        // cout << cipher_res.logp << ", " << cipher_res.logq << endl;
+        // cout << "downsampling channel add " << i << " done" << endl;
     }
     scheme.reScaleByAndEqual(cipher_res, logp);
     delete[] mask;
@@ -593,17 +783,17 @@ void Scheme_::cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& ciph
  * LeftRotKey: 1, 3 * w / 2, 3 * w * w / 4
  * RightRotKey: 1, w / 2, w * w / 4
  */
-void Scheme_::cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme& scheme, long w, long c) {
-    cout << "downsampling start (LeftRotKey:" << 1 << ", " << 3 * w / 2 << ", " << 3 * w * w / 4 << ", RightRotKey:" << 1 << ", " << w / 2 << ", " << w * w / 4 << ")" << endl;
+void Scheme_::cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c) {
+    // cout << "downsampling start (LeftRotKey:" << 1 << ", " << 3 * w / 2 << ", " << 3 * w * w / 4 << ", RightRotKey:" << 1 << ", " << w / 2 << ", " << w * w / 4 << ")" << endl;
     Ciphertext cipher_ds_1;
     Ciphertext cipher_ds_2;
 
     cipherDownsamplingRow(cipher_ds_1, cipher_msg, scheme, w, c);
-    cout << "downsampling row done" << cipher_ds_1.logp << ", " << cipher_ds_1.logq << endl;
+    // cout << "downsampling row done" << cipher_ds_1.logp << ", " << cipher_ds_1.logq << endl;
     cipherDownsamplingColumn(cipher_ds_2, cipher_ds_1, scheme, w, c);
-    cout << "downsampling column done" << cipher_ds_2.logp << ", " << cipher_ds_2.logq << endl;
+    // cout << "downsampling column done" << cipher_ds_2.logp << ", " << cipher_ds_2.logq << endl;
     cipherDownsamplingChannel(cipher_res, cipher_ds_2, scheme, w, c);
-    cout << "downsampling channel done" << cipher_res.logp << ", " << cipher_res.logq << endl;
+    // cout << "downsampling channel done" << cipher_res.logp << ", " << cipher_res.logq << endl;
     cipher_ds_1.free();
     cipher_ds_2.free();
 }
@@ -622,11 +812,11 @@ void Scheme_::cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg,
  * 
  * For each channel i, Y = gamma[i] * X + beta[i]
  */
-void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme& scheme, long w, long c, double* gamma, double* beta) {
+void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
-    cout << "cipherBatchNormLayerAndEqual start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // cout << "cipherBatchNormLayerAndEqual start: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     complex<double>* mvec_a = new complex<double>[n];
     complex<double>* mvec_b = new complex<double>[n];
     packConst(mvec_a, n, gamma, w, c);
@@ -635,7 +825,7 @@ void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme& schem
     scheme.multByConstVecAndEqual(cipher_msg, mvec_a, logp);
     scheme.reScaleByAndEqual(cipher_msg, logp);
     scheme.addConstAndEqual(cipher_msg, *mvec_b, logp);
-    cout << "cipherBatchNormLayerAndEqual end: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    // cout << "cipherBatchNormLayerAndEqual end: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     delete[] mvec_a;
     delete[] mvec_b;
 }
@@ -648,9 +838,9 @@ void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme& schem
  * 
  * Consumed Level: 1
  * 
- * f(x) = x * sigmoid(x)
+ * f(x) = x^2
  */
-void Scheme_::cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme& scheme) {
+void Scheme_::cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme) {
     long logp = cipher_msg.logp;
     scheme.squareAndEqual(cipher_msg);
     scheme.reScaleByAndEqual(cipher_msg, logp);
@@ -678,15 +868,15 @@ void Scheme_::cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme& scheme) {
  * LeftRotKey: (w * w) >> 1 ... log2(w * w)
  * 
  */
-void Scheme_::cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme& scheme, long w, long c) {
-    cout << "avg pooling start " << endl;
+void Scheme_::cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c) {
+    // cout << "avg pooling start " << endl;
     long logp = cipher_msg.logp;
     Ciphertext cipher_temp;
     for (int i = w * w / 2; i > 0; i /= 2) {
         cipher_temp.copy(cipher_msg);
         scheme.leftRotateFastAndEqual(cipher_temp, i);
         scheme.addAndEqual(cipher_msg, cipher_temp);
-        cout << "avg pooling add " << i << " done" << endl;
+        // cout << "avg pooling add " << i << " done" << endl;
     }
 }
 
@@ -710,8 +900,8 @@ void Scheme_::cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme& scheme, l
  * LeftRotKey: {1, 2, 4, ..., c_in / 2} * w * w
  * RightRotKey: w * w
  */
-void Scheme_::cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme& scheme, long w, long c_in, long c_out) {
-    cout << "linear layer start " << endl;
+void Scheme_::cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme_ &scheme, long w, long c_in, long c_out) {
+    // cout << "linear layer start " << endl;
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
@@ -724,7 +914,7 @@ void Scheme_::cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, 
         scheme.multByConstVecAndEqual(cipher_temp, mvec, logp);
         scheme.reScaleByAndEqual(cipher_temp, logp);
 
-        cout << "linear layer mult " << i << " done" << endl;
+        // cout << "linear layer mult " << i << " done" << endl;
 
         for (int j = 1; j < i; j++) {
             scheme.rightRotateFastAndEqual(cipher_temp, w * w);
@@ -744,7 +934,7 @@ void Scheme_::cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, 
             scheme.addAndEqual(cipher_res, cipher_sum);
         }
 
-        cout << "linear layer add " << i << " done" << endl;
+        // cout << "linear layer add " << i << " done" << endl;
     }
     packConst(mvec, n, bias, w, c_out);
     scheme.encrypt(cipher_temp, mvec, n, logp, logq);

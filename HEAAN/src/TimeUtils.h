@@ -9,7 +9,7 @@
 #define HEAAN_TIMEUTILS_H_
 
 #include <iostream>
-
+#include <iomanip>
 struct timeval;
 
 namespace heaan {

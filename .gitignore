@@ -6,6 +6,12 @@ HEAAN/Release
 
 HEAAN/run/TestHEAAN
 
+HEAAN/run/cipher
+
+HEAAN/run/cipher_
+
+HEAAN/run/serkey
+
 HEAAN/lib/*.a
 
 *.d

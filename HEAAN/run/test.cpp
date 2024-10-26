@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
 
 	long logq = 800; ///< Ciphertext Modulus
 	long logp = 30; ///< Real message will be quantized by multiplying 2^40
-	long logn = 4; ///< log2(The number of slots)
+	long logn = 14; ///< log2(The number of slots)
 
 //----------------------------------------------------------------------------------
 //   STANDARD TESTS
