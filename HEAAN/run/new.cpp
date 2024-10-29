@@ -43,17 +43,17 @@ void print_rep_img(double* dec0, long w) {
 }
 
 void print_rep(complex<double>* dec0, long n) {
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 10; i++) {
         cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
         if ((i + 1) % 5 == 0) cout << endl;
     }
     cout << " ... " << endl;
-    for (int i = n/2-5; i < n/2 + 5; i++) {
+    for (int i = n/2 - 5; i < n/2 + 5; i++) {
         cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
         if ((i + 1) % 5 == 0) cout << endl;
     }
     cout << " ... " << endl;
-    for (int i = n - 5; i < n; i++) {
+    for (int i = n - 10; i < n; i++) {
         cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
         if ((i + 1) % 5 == 0) cout << endl;
     }
@@ -75,10 +75,17 @@ void print_shape(complex<double>* mvec, long w, long c, long n) {
 }
 
 void print_res_classification(complex<double>* mvec) {
+    double max_val = -100;
+    int max_idx = -1;
     for (int i = 0; i < 10; i++) {
-        cout << setw(8) << mvec[i * 64].real();
+        cout << setw(8) << mvec[i * 64].real() << " ";
+        if (mvec[i * 64].real() > max_val) {
+            max_val = mvec[i * 64].real();
+            max_idx = i;
+        }
     }
     cout << endl;
+    cout << "Max value: " << max_val << " at index: " << max_idx << endl;
 }
 
 void readImage(string path, double*& image, int& w, int& h, int& c) {
@@ -117,15 +124,18 @@ std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
 int main(int argc, char **argv) {
     cout << "start" << endl;
     srand(time(NULL));
-    SetNumThreads(4);
+    SetNumThreads(16);
     
-    TimeUtils timeutils;
+    TimeUtils timeutils, totaltimeutils;
     Ring ring;
     SecretKey secretKey(ring);
-    SerializationUtils_::readSecretKey(secretKey, "secretKey.bin");
+    SerializationUtils_::readSecretKey(secretKey, "secretKey.bin"); // Read secret key from file path
     Scheme_ scheme(secretKey, ring, true);
-    SerializationUtils_::checkSerialDirectory("./serkey");
+    SerializationUtils_::checkSerialDirectory("./serkey"); 
 
+    totaltimeutils.start("program");
+
+    // Key Generation
     timeutils.start("key generation");
 
     cout << "keymap: ENCRYPTION    : " << scheme.serKeyMap.at(ENCRYPTION) << endl;
@@ -133,7 +143,7 @@ int main(int argc, char **argv) {
     
     Key* key = SerializationUtils::readKey(scheme.serKeyMap.at(ENCRYPTION));
     cout << "key: " << key->rax[0] << ", " << key->rbx[0] << endl;
-    // Key Generation
+    
     std::vector<std::array<long, 4>> params = {
         {{CONV2D, 32, 3, 16}},
         {{CONV2DFAST, 32, 16, 16}},
@@ -153,12 +163,12 @@ int main(int argc, char **argv) {
     generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
     generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
     
-    cout << "key done" << endl;
+    timeutils.stop("key generation");
 
     // Parameters //
     // Total levels: logq / logp
-    long logq = 860; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
-    long logp = 10; ///< Scaling Factor (larger logp will give you more accurate value)
+    long logq = 2000; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
+    long logp = 20; ///< Scaling Factor (larger logp will give you more accurate value)
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
     long slots = n;
@@ -179,69 +189,64 @@ int main(int argc, char **argv) {
 
     delete[] img;
 
-    cout << "img prepare to encrypt done" << endl;
-
     std::vector<string> paths = {
-        "../../../FL/weights/conv1.txt",
-        "../../../FL/weights/bn1.txt",
-        "../../../FL/weights/layer1.0.conv1.txt",
-        "../../../FL/weights/layer1.0.bn1.txt",
-        "../../../FL/weights/layer1.0.conv2.txt",
-        "../../../FL/weights/layer1.0.bn2.txt",
-        "../../../FL/weights/layer1.1.conv1.txt",
-        "../../../FL/weights/layer1.1.bn1.txt",
-        "../../../FL/weights/layer1.1.conv2.txt",
-        "../../../FL/weights/layer1.1.bn2.txt",
-        "../../../FL/weights/layer1.2.conv1.txt",
-        "../../../FL/weights/layer1.2.bn1.txt",
-        "../../../FL/weights/layer1.2.conv2.txt",
-        "../../../FL/weights/layer1.2.bn2.txt",
-        "../../../FL/weights/layer2.0.conv1.txt",
-        "../../../FL/weights/layer2.0.bn1.txt",
-        "../../../FL/weights/layer2.0.conv2.txt",
-        "../../../FL/weights/layer2.0.bn2.txt",
-        "../../../FL/weights/layer2.0.downsample.0.txt",
-        "../../../FL/weights/layer2.0.downsample.1.txt",
-        "../../../FL/weights/layer2.1.conv1.txt",
-        "../../../FL/weights/layer2.1.bn1.txt",
-        "../../../FL/weights/layer2.1.conv2.txt",
-        "../../../FL/weights/layer2.1.bn2.txt",
-        "../../../FL/weights/layer2.2.conv1.txt",
-        "../../../FL/weights/layer2.2.bn1.txt",
-        "../../../FL/weights/layer2.2.conv2.txt",
-        "../../../FL/weights/layer2.2.bn2.txt",
-        "../../../FL/weights/layer3.0.conv1.txt",
-        "../../../FL/weights/layer3.0.bn1.txt",
-        "../../../FL/weights/layer3.0.conv2.txt",
-        "../../../FL/weights/layer3.0.bn2.txt",
-        "../../../FL/weights/layer3.0.downsample.0.txt",
-        "../../../FL/weights/layer3.0.downsample.1.txt",
-        "../../../FL/weights/layer3.1.conv1.txt",
-        "../../../FL/weights/layer3.1.bn1.txt",
-        "../../../FL/weights/layer3.1.conv2.txt",
-        "../../../FL/weights/layer3.1.bn2.txt",
-        "../../../FL/weights/layer3.2.conv1.txt",
-        "../../../FL/weights/layer3.2.bn1.txt",
-        "../../../FL/weights/layer3.2.conv2.txt",
-        "../../../FL/weights/layer3.2.bn2.txt",
-        "../../../FL/weights/layer3.3.conv1.txt",
-        "../../../FL/weights/layer3.3.bn1.txt",
-        "../../../FL/weights/layer3.3.conv2.txt",
-        "../../../FL/weights/layer3.3.bn2.txt",
-        "../../../FL/weights/fc.weight.txt",
-        "../../../FL/weights/fc.bias.txt",
+        "../../weights/conv1.txt",
+        "../../weights/bn1.txt",
+        "../../weights/layer1.0.conv1.txt",
+        "../../weights/layer1.0.bn1.txt",
+        "../../weights/layer1.0.conv2.txt",
+        "../../weights/layer1.0.bn2.txt",
+        "../../weights/layer1.1.conv1.txt",
+        "../../weights/layer1.1.bn1.txt",
+        "../../weights/layer1.1.conv2.txt",
+        "../../weights/layer1.1.bn2.txt",
+        "../../weights/layer1.2.conv1.txt",
+        "../../weights/layer1.2.bn1.txt",
+        "../../weights/layer1.2.conv2.txt",
+        "../../weights/layer1.2.bn2.txt",
+        "../../weights/layer2.0.conv1.txt",
+        "../../weights/layer2.0.bn1.txt",
+        "../../weights/layer2.0.conv2.txt",
+        "../../weights/layer2.0.bn2.txt",
+        "../../weights/layer2.0.downsample.0.txt",
+        "../../weights/layer2.0.downsample.1.txt",
+        "../../weights/layer2.1.conv1.txt",
+        "../../weights/layer2.1.bn1.txt",
+        "../../weights/layer2.1.conv2.txt",
+        "../../weights/layer2.1.bn2.txt",
+        "../../weights/layer2.2.conv1.txt",
+        "../../weights/layer2.2.bn1.txt",
+        "../../weights/layer2.2.conv2.txt",
+        "../../weights/layer2.2.bn2.txt",
+        "../../weights/layer3.0.conv1.txt",
+        "../../weights/layer3.0.bn1.txt",
+        "../../weights/layer3.0.conv2.txt",
+        "../../weights/layer3.0.bn2.txt",
+        "../../weights/layer3.0.downsample.0.txt",
+        "../../weights/layer3.0.downsample.1.txt",
+        "../../weights/layer3.1.conv1.txt",
+        "../../weights/layer3.1.bn1.txt",
+        "../../weights/layer3.1.conv2.txt",
+        "../../weights/layer3.1.bn2.txt",
+        "../../weights/layer3.2.conv1.txt",
+        "../../weights/layer3.2.bn1.txt",
+        "../../weights/layer3.2.conv2.txt",
+        "../../weights/layer3.2.bn2.txt",
+        "../../weights/layer3.3.conv1.txt",
+        "../../weights/layer3.3.bn1.txt",
+        "../../weights/layer3.3.conv2.txt",
+        "../../weights/layer3.3.bn2.txt",
+        "../../weights/fc.weight.txt",
+        "../../weights/fc.bias.txt",
     };
     
+    timeutils.start("encrypt");
     Ciphertext cipher_msg;
     scheme.encrypt(cipher_msg, mvec1, n, logp, logq);
     print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
-    cout << "encrypt done" << endl;
-
     timeutils.stop("encrypt");
 
-    timeutils.start("forward");
-
-    numThreads = 8;
+    heaan::numThreads = 16;
     
     Ciphertext cipher_res;
     Ciphertext cipher_temp;
@@ -260,7 +265,7 @@ int main(int argc, char **argv) {
     }
     timeutils.stop("layer1");
 
-    numThreads = 8;
+    heaan::numThreads = 32;
 
     timeutils.start("layer2");
     if (!SerializationUtils_::checkFile("./cipher/layer2.3.bin")) {
@@ -270,7 +275,7 @@ int main(int argc, char **argv) {
     }
     timeutils.stop("layer2");
 
-    numThreads = 16;
+    heaan::numThreads = 64;
 
     timeutils.start("layer3");
     if (!SerializationUtils_::checkFile("./cipher/layer3.3.bin")) {
@@ -292,6 +297,8 @@ int main(int argc, char **argv) {
     complex<double>* dec0 = scheme.decrypt(secretKey, cipher_res);
     print_res_classification(dec0);
     timeutils.stop("decrypt");
+
+    totaltimeutils.stop("program");
 
     delete[] dec0;
     delete[] mvec1;

@@ -18,8 +18,9 @@ static long BN = 3;
 static long RELU = 4;
 static long ADD = 5;
 static long DOWNSAMPLE = 6;
-static long AVGPOOL = 7;
-static long LINEAR = 8;
+static long DOWNSAMPLEFAST = 7;
+static long AVGPOOL = 8;
+static long LINEAR = 9;
 
 double*** readkernels(string path, long c_out, long c_in) {
     ifstream file(path);
@@ -154,9 +155,10 @@ void rotKeysRequirement(std::set<long>& leftRotKeys, std::set<long>& rightRotKey
             rightRotKeys.insert({1, w, w * w});
         }
         else if (type == CONV2DFAST) {
+            // {1, 2, 4, ..., c / 2} * w * w, {1, ..., c_out - 1} * w * w
             leftRotKeys.insert({1, w});
             for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w);
-            rightRotKeys.insert(1);
+            rightRotKeys.insert({1, w});
             for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w);
         }
         else if (type == CONV2DFASTDOWNSAMPLE) {
@@ -164,10 +166,17 @@ void rotKeysRequirement(std::set<long>& leftRotKeys, std::set<long>& rightRotKey
             for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w / 4);
             rightRotKeys.insert({1, w, w / 2});
             for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w / 4);
+            for (long i = 1; i <= w / 4; i <<= 1) leftRotKeys.insert({i, i * 3 * w / 2});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * 3 * w * w / 4);
         }
         else if (type == DOWNSAMPLE) {
             leftRotKeys.insert({1, 3 * w / 2, 3 * w * w / 4});
             rightRotKeys.insert({1, w / 2, w * w / 4});
+        }
+        else if (type == DOWNSAMPLEFAST) {
+            // {1, 2, 4, ..., w / 4} * {1, 3 * w / 2}, {1, 2, 4, ..., c / 2} * 3 * w * w / 4
+            for (long i = 1; i <= w / 4; i <<= 1) leftRotKeys.insert({i, i * 3 * w / 2});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * 3 * w * w / 4);
         }
         else if (type == AVGPOOL) {
             for (long i = w * w / 2; i > 0; i >>= 1) leftRotKeys.insert(i);

@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Parse options
 while getopts "rcd" opt; do
     case $opt in
@@ -17,6 +19,7 @@ while getopts "rcd" opt; do
         c)
             echo "Cleaning Ciphers Saved..."
             rm ./cipher/*
+            pause 0.2
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
