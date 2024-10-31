@@ -153,6 +153,7 @@ void rotKeysRequirement(std::set<long>& leftRotKeys, std::set<long>& rightRotKey
         if (type == CONV2D) {
             leftRotKeys.insert({1, w, w * w});
             rightRotKeys.insert({1, w, w * w});
+            for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w);
         }
         else if (type == CONV2DFAST) {
             // {1, 2, 4, ..., c / 2} * w * w, {1, ..., c_out - 1} * w * w
@@ -183,7 +184,7 @@ void rotKeysRequirement(std::set<long>& leftRotKeys, std::set<long>& rightRotKey
         }
         else if (type == LINEAR) {
             for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w);
-            rightRotKeys.insert(w * w);
+            for (long i = 1; i <= c_out; i <<= 1) rightRotKeys.insert(i * w * w);
         }
     }
 }
@@ -307,6 +308,7 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.bn2.bin");
             skip = false;
         }
+        scheme.reScaleToAndEqual(cipher_msg, cipher_res.logq);
         scheme.addAndEqual(cipher_res, cipher_msg);
         scheme.cipherReLUAndEqual(cipher_res, scheme);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.relu2.bin");

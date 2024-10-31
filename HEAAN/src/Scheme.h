@@ -40,7 +40,7 @@ public:
 	std::map<long, std::string> serKeyMap; ///< contain Encryption, Multiplication and Conjugation keys, if generated
 	std::map<long, std::string> serLeftRotKeyMap; ///< contain left rotation keys, if generated
 
-	Scheme(SecretKey& secretKey, Ring& ring, bool isSerialized = false);
+	Scheme(SecretKey& secretKey, Ring& ring, bool isSerialized = false, std::string dir="./serkey");
 
 	virtual ~Scheme();
 
@@ -49,21 +49,21 @@ public:
 	//----------------------------------------------------------------------------------
 
 
-	void addEncKey(SecretKey& secretKey);
+	void addEncKey(SecretKey& secretKey, std::string dir="./serkey");
 
-	void addMultKey(SecretKey& secretKey);
+	void addMultKey(SecretKey& secretKey, std::string dir="./serkey");
 
-	void addConjKey(SecretKey& secretKey);
+	void addConjKey(SecretKey& secretKey, std::string dir="./serkey");
 
-	void addLeftRotKey(SecretKey& secretKey, long r);
+	void addLeftRotKey(SecretKey& secretKey, long r, std::string dir="./serkey");
 
-	void addRightRotKey(SecretKey& secretKey, long r); 
+	void addRightRotKey(SecretKey& secretKey, long r, std::string dir="./serkey"); 
 
-	void addLeftRotKeys(SecretKey& secretKey);
+	void addLeftRotKeys(SecretKey& secretKey, std::string dir="./serkey");
 
-	void addRightRotKeys(SecretKey& secretKey);
+	void addRightRotKeys(SecretKey& secretKey, std::string dir="./serkey");
 
-	void addBootKey(SecretKey& secretKey, long logl, long logp);
+	void addBootKey(SecretKey& secretKey, long logl, long logp, std::string dir="./serkey");
 
 
 	//----------------------------------------------------------------------------------

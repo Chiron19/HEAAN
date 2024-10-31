@@ -60,15 +60,14 @@ void print_rep(complex<double>* dec0, long n) {
     cout << endl;
 }
 
-void print_shape(complex<double>* mvec, long w, long c, long n) {
+void print_shape(complex<double>* mvec, long w, long c) {
     for (int i = 0; i < c; i++) {
         for (int j = 0; j < w; j++) {
             for (int k = 0; k < w; k++) {
-                cout << setw(6) << mvec[i * w * w + j * w + k].real();
+                cout << setw(9) << setprecision(3) << mvec[i * w * w + j * w + k].real() << ",";
             }
             cout << endl;
         }
-        cout << endl;
         cout << endl;
     }
     cout << endl;
@@ -96,15 +95,15 @@ void readImage(string path, double*& image, int& w, int& h, int& c) {
     stbi_image_free(rgb_image);
 }
 
-void generateSerialLeftRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
+void generateSerialLeftRotKeys(std::set<long>& rotKeys, heaan::Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
     for (long i : rotKeys) {
-        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
+        if (heaan::SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
     }
 }
 
-void generateSerialRightRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
+void generateSerialRightRotKeys(std::set<long>& rotKeys, heaan::Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
     for (long i : rotKeys) {
-        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
+        if (heaan::SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
     }
 }
 
@@ -167,7 +166,7 @@ int main(int argc, char **argv) {
 
     // Parameters //
     // Total levels: logq / logp
-    long logq = 2000; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
+    long logq = 2100; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
     long logp = 20; ///< Scaling Factor (larger logp will give you more accurate value)
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
@@ -176,17 +175,15 @@ int main(int argc, char **argv) {
     double* img = new double[1024 * 3];
     int w, h, c;
     readImage("./luis.png", img, w, h, c);
-    print_rep_img(img, static_cast<long>(w));
-
-    complex<double>* mvec1 = new complex<double>[n];
-    for (int i = 0; i < n; i++) {
-        if (i < 1024 * 3) {
-            mvec1[i] = img[i];
-        } else {
-            mvec1[i] = 0;
+    complex<double>* mvec = new complex<double>[n];
+    for (int i = 0; i < c; i++) {
+        for (int j = 0; j < w; j++) {
+            for (int k = 0; k < w; k++) {
+                mvec[i * w * h + j * h + k] = (img[j * c * h + k * c + i] - 0.5) * 2.0; // Normalize the image and Adjust img[w, h, c] -> mvec[c, w, h]
+            }
         }
     }
-
+    for (int i = c * w * h; i < n; i++) mvec[i] = 0;
     delete[] img;
 
     std::vector<string> paths = {
@@ -240,9 +237,11 @@ int main(int argc, char **argv) {
         "../../weights/fc.bias.txt",
     };
     
+    heaan::SerializationUtils_::checkSerialDirectory("./cipher");
+
     timeutils.start("encrypt");
     Ciphertext cipher_msg;
-    scheme.encrypt(cipher_msg, mvec1, n, logp, logq);
+    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
     print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
     timeutils.stop("encrypt");
 
@@ -265,7 +264,7 @@ int main(int argc, char **argv) {
     }
     timeutils.stop("layer1");
 
-    heaan::numThreads = 32;
+    heaan::numThreads = 16;
 
     timeutils.start("layer2");
     if (!SerializationUtils_::checkFile("./cipher/layer2.3.bin")) {
@@ -275,7 +274,7 @@ int main(int argc, char **argv) {
     }
     timeutils.stop("layer2");
 
-    heaan::numThreads = 64;
+    heaan::numThreads = 16;
 
     timeutils.start("layer3");
     if (!SerializationUtils_::checkFile("./cipher/layer3.3.bin")) {
@@ -286,10 +285,13 @@ int main(int argc, char **argv) {
     timeutils.stop("layer3");
 
     timeutils.start("layerEnd");
-    if (!SerializationUtils_::checkFile("./cipher/layerEnd.bin")) {
-        cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
-        print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
+    if (!heaan::SerializationUtils_::checkFile("./cipher/layerEnd.linear.bin")) {
+        cipher_temp = *heaan::SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
+        print_shape(scheme.decrypt(secretKey, cipher_temp), 8, 64);
         layerEnd(cipher_res, cipher_temp, scheme, paths);
+    }
+    else {
+        cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
     }
     timeutils.stop("layerEnd");
 
@@ -301,7 +303,7 @@ int main(int argc, char **argv) {
     totaltimeutils.stop("program");
 
     delete[] dec0;
-    delete[] mvec1;
+    delete[] mvec;
 
 	return 0;
 }

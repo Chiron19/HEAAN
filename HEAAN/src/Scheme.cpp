@@ -18,9 +18,9 @@ using namespace NTL;
 
 namespace heaan {
 
-Scheme::Scheme(SecretKey& secretKey, Ring& ring, bool isSerialized) : ring(ring), isSerialized(isSerialized) {
-	addEncKey(secretKey);
-	addMultKey(secretKey);
+Scheme::Scheme(SecretKey& secretKey, Ring& ring, bool isSerialized, string dir) : ring(ring), isSerialized(isSerialized) {
+	addEncKey(secretKey, dir);
+	addMultKey(secretKey, dir);
 };
 
 Scheme::~Scheme() {
@@ -30,7 +30,7 @@ Scheme::~Scheme() {
 		delete t.second;
 }
 
-void Scheme::addEncKey(SecretKey& secretKey) {
+void Scheme::addEncKey(SecretKey& secretKey, string dir) {
 	ZZ* ax = new ZZ[N];
 	ZZ* bx = new ZZ[N];
 
@@ -45,7 +45,7 @@ void Scheme::addEncKey(SecretKey& secretKey) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "./serkey/ENCRYPTION.txt";
+		string path = dir + "/ENCRYPTION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(ENCRYPTION, path));
 		delete key;
@@ -54,7 +54,7 @@ void Scheme::addEncKey(SecretKey& secretKey) {
 	}
 }
 
-void Scheme::addMultKey(SecretKey& secretKey) {
+void Scheme::addMultKey(SecretKey& secretKey, string dir) {
 	ZZ* ax = new ZZ[N];
 	ZZ* bx = new ZZ[N];
 	ZZ* sxsx = new ZZ[N];
@@ -75,7 +75,7 @@ void Scheme::addMultKey(SecretKey& secretKey) {
 	ring.CRT(key->rbx, bx, nprimes);
 	delete[] ax; delete[] bx;
 	if(isSerialized) {
-		string path = "./serkey/MULTIPLICATION.txt";
+		string path = dir + "/MULTIPLICATION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(MULTIPLICATION, path));
 		delete key;
@@ -84,7 +84,7 @@ void Scheme::addMultKey(SecretKey& secretKey) {
 	}
 }
 
-void Scheme::addConjKey(SecretKey& secretKey) {
+void Scheme::addConjKey(SecretKey& secretKey, string dir) {
 	ZZ* ax = new ZZ[N];
 	ZZ* bx = new ZZ[N];
 
@@ -105,7 +105,7 @@ void Scheme::addConjKey(SecretKey& secretKey) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "./serkey/CONJUGATION.txt";
+		string path = dir + "/CONJUGATION.txt";
 		SerializationUtils::writeKey(key, path);
 		serKeyMap.insert(pair<long, string>(CONJUGATION, path));
 		delete key;
@@ -114,7 +114,7 @@ void Scheme::addConjKey(SecretKey& secretKey) {
 	}
 }
 
-void Scheme::addLeftRotKey(SecretKey& secretKey, long r) {
+void Scheme::addLeftRotKey(SecretKey& secretKey, long r, string dir) {
 	ZZ* ax = new ZZ[N];
 	ZZ* bx = new ZZ[N];
 
@@ -135,7 +135,7 @@ void Scheme::addLeftRotKey(SecretKey& secretKey, long r) {
 	delete[] ax; delete[] bx;
 
 	if(isSerialized) {
-		string path = "./serkey/ROTATION_" + to_string(r) + ".txt";
+		string path = dir + "/ROTATION_" + to_string(r) + ".txt";
 		SerializationUtils::writeKey(key, path);
 		serLeftRotKeyMap.insert(pair<long, string>(r, path));
 		delete key;
@@ -144,36 +144,36 @@ void Scheme::addLeftRotKey(SecretKey& secretKey, long r) {
 	}
 }
 
-void Scheme::addRightRotKey(SecretKey& secretKey, long r) {
+void Scheme::addRightRotKey(SecretKey& secretKey, long r, string dir) {
 	long idx = Nh - r;
 	if(leftRotKeyMap.find(idx) == leftRotKeyMap.end() && serLeftRotKeyMap.find(idx) == serLeftRotKeyMap.end()) {
-		addLeftRotKey(secretKey, idx);
+		addLeftRotKey(secretKey, idx, dir);
 	}
 }
 
-void Scheme::addLeftRotKeys(SecretKey& secretKey) {
+void Scheme::addLeftRotKeys(SecretKey& secretKey, string dir) {
 	for (long i = 0; i < logN - 1; ++i) {
 		long idx = 1 << i;
 		if(leftRotKeyMap.find(idx) == leftRotKeyMap.end() && serLeftRotKeyMap.find(idx) == serLeftRotKeyMap.end()) {
-			addLeftRotKey(secretKey, idx);
+			addLeftRotKey(secretKey, idx, dir);
 		}
 	}
 }
 
-void Scheme::addRightRotKeys(SecretKey& secretKey) {
+void Scheme::addRightRotKeys(SecretKey& secretKey, string dir) {
 	for (long i = 0; i < logN - 1; ++i) {
 		long idx = Nh - (1 << i);
 		if(leftRotKeyMap.find(idx) == leftRotKeyMap.end() && serLeftRotKeyMap.find(idx) == serLeftRotKeyMap.end()) {
-			addLeftRotKey(secretKey, idx);
+			addLeftRotKey(secretKey, idx, dir);
 		}
 	}
 }
 
-void Scheme::addBootKey(SecretKey& secretKey, long logl, long logp) {
+void Scheme::addBootKey(SecretKey& secretKey, long logl, long logp, string dir) {
 	ring.addBootContext(logl, logp);
 
-	addConjKey(secretKey);
-	addLeftRotKeys(secretKey);
+	addConjKey(secretKey, dir);
+	addLeftRotKeys(secretKey, dir);
 
 	long loglh = logl/2;
 	long k = 1 << loglh;
@@ -181,14 +181,14 @@ void Scheme::addBootKey(SecretKey& secretKey, long logl, long logp) {
 
 	for (long i = 1; i < k; ++i) {
 		if(leftRotKeyMap.find(i) == leftRotKeyMap.end() && serLeftRotKeyMap.find(i) == serLeftRotKeyMap.end()) {
-			addLeftRotKey(secretKey, i);
+			addLeftRotKey(secretKey, i, dir);
 		}
 	}
 
 	for (long i = 1; i < m; ++i) {
 		long idx = i * k;
 		if(leftRotKeyMap.find(idx) == leftRotKeyMap.end() && serLeftRotKeyMap.find(idx) == serLeftRotKeyMap.end()) {
-			addLeftRotKey(secretKey, idx);
+			addLeftRotKey(secretKey, idx, dir);
 		}
 	}
 }

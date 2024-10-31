@@ -24,21 +24,37 @@ using namespace std;
 using namespace NTL;
 using namespace heaan;
 
-void print_shape(complex<double>* mvec, long w, long c, long n) {
-    for (int i = 0; i < c; i++) {
-        for (int j = 0; j < w; j++) {
-            for (int k = 0; k < w; k++) {
-                if (mvec[i * w * w + j * w + k].real() < 0.001) {
-                    cout << setw(7) << setprecision(4) << 0.0 << " ";
-                } else {
-                    cout << setw(7) << int(round(1000.0 * mvec[i * w * w + j * w + k].real()) / 1000) << " ";
+void print_shape(complex<double>* mvec, long w, long c, long n, std::string dir="") {
+    if (dir != "") {
+        ofstream file(dir);
+        if (!file.is_open()) {
+            cout << "Cannot open file " << dir << endl;
+            return;
+        }
+        for (int i = 0; i < c; i++) {
+            for (int j = 0; j < w; j++) {
+                for (int k = 0; k < w; k++) {
+                    file << setw(8) << setprecision(4) << mvec[i * w * w + j * w + k].real() << " ";
                 }
+                file << endl;
+            }
+            file << endl;
+        }
+        file << endl;
+        cout << "Saved to " << dir << endl;
+        file.close();
+    } else {
+        for (int i = 0; i < c; i++) {
+            for (int j = 0; j < w; j++) {
+                for (int k = 0; k < w; k++) {
+                    cout << setw(8) << setprecision(4) << mvec[i * w * w + j * w + k].real() << " ";
+                }
+                cout << endl;
             }
             cout << endl;
         }
         cout << endl;
     }
-    cout << endl;
 }
 
 void print_res_classification(complex<double>* mvec) {
@@ -65,13 +81,13 @@ void readImage(string path, double*& image, int& w, int& h, int& c) {
 
 void generateSerialLeftRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
     for (long i : rotKeys) {
-        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
+        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i, path);
     }
 }
 
 void generateSerialRightRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
     for (long i : rotKeys) {
-        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
+        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i, path);
     }
 }
 
@@ -96,14 +112,23 @@ int main(int argc, char **argv) {
     Ring ring;
     SecretKey secretKey(ring);
     SerializationUtils_::readSecretKey(secretKey, "secretKey.bin");
-    Scheme_ scheme(secretKey, ring, true);
+
     SerializationUtils_::checkSerialDirectory("./serkey");
+
+    Scheme_ scheme(secretKey, ring, true);
 
     cout << "keymap: ENCRYPTION    : " << scheme.serKeyMap.at(ENCRYPTION) << endl;
     cout << "keymap: MULTIPLICATION: " << scheme.serKeyMap.at(MULTIPLICATION) << endl;
     
     std::vector<std::array<long, 4>> params = {
+        {{CONV2D, 32, 3, 16}},
         {{CONV2DFAST, 32, 16, 16}},
+        {{CONV2DFASTDOWNSAMPLE, 32, 16, 32}},
+        {{CONV2DFAST, 16, 32, 32}},
+        {{CONV2DFASTDOWNSAMPLE, 16, 32, 64}},
+        {{CONV2DFAST, 8, 64, 64}},
+        {{AVGPOOL, 8, 64, 64}},
+        {{LINEAR, 8, 64, 10}}
     };
     std::set<long> leftRotKeys;
     std::set<long> rightRotKeys;
@@ -111,8 +136,11 @@ int main(int argc, char **argv) {
     cout << "leftRotKeys : " << leftRotKeys << endl;
     cout << "rightRotKeys: " << rightRotKeys << endl;
 
-    generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey, "./temp");
-    generateSerialRightRotKeys(rightRotKeys, scheme, secretKey, "./temp");
+    // leftRotKeys.insert({8, 64});
+    // rightRotKeys.insert({8, 64});
+
+    generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
+    generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
     
     cout << "key done" << endl;
 
@@ -123,28 +151,60 @@ int main(int argc, char **argv) {
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
     long slots = n;
-    long c = 16;
-    long w = 32;
 
-    complex<double>* mvec = new complex<double>[n]; // Dynamically allocate memory for the array
-    for (int i = 0; i < c; i++) 
-    {
-        for (int j = 0; j < w; j++)
-        {
-            for (int k = 0; k < w; k++)
-            {
-                mvec[i * w * w + j * w + k] = j * w + k;
-            }
-            
-        }
-    }
-    print_shape(mvec, w, c, n);
+    std::vector<string> paths = {
+        "../../weights/conv1.txt",
+        "../../weights/bn1.txt",
+        "../../weights/layer1.0.conv1.txt",
+        "../../weights/layer1.0.bn1.txt",
+        "../../weights/layer1.0.conv2.txt",
+        "../../weights/layer1.0.bn2.txt",
+        "../../weights/layer1.1.conv1.txt",
+        "../../weights/layer1.1.bn1.txt",
+        "../../weights/layer1.1.conv2.txt",
+        "../../weights/layer1.1.bn2.txt",
+        "../../weights/layer1.2.conv1.txt",
+        "../../weights/layer1.2.bn1.txt",
+        "../../weights/layer1.2.conv2.txt",
+        "../../weights/layer1.2.bn2.txt",
+        "../../weights/layer2.0.conv1.txt",
+        "../../weights/layer2.0.bn1.txt",
+        "../../weights/layer2.0.conv2.txt",
+        "../../weights/layer2.0.bn2.txt",
+        "../../weights/layer2.0.downsample.0.txt",
+        "../../weights/layer2.0.downsample.1.txt",
+        "../../weights/layer2.1.conv1.txt",
+        "../../weights/layer2.1.bn1.txt",
+        "../../weights/layer2.1.conv2.txt",
+        "../../weights/layer2.1.bn2.txt",
+        "../../weights/layer2.2.conv1.txt",
+        "../../weights/layer2.2.bn1.txt",
+        "../../weights/layer2.2.conv2.txt",
+        "../../weights/layer2.2.bn2.txt",
+        "../../weights/layer3.0.conv1.txt",
+        "../../weights/layer3.0.bn1.txt",
+        "../../weights/layer3.0.conv2.txt",
+        "../../weights/layer3.0.bn2.txt",
+        "../../weights/layer3.0.downsample.0.txt",
+        "../../weights/layer3.0.downsample.1.txt",
+        "../../weights/layer3.1.conv1.txt",
+        "../../weights/layer3.1.bn1.txt",
+        "../../weights/layer3.1.conv2.txt",
+        "../../weights/layer3.1.bn2.txt",
+        "../../weights/layer3.2.conv1.txt",
+        "../../weights/layer3.2.bn1.txt",
+        "../../weights/layer3.2.conv2.txt",
+        "../../weights/layer3.2.bn2.txt",
+        "../../weights/layer3.3.conv1.txt",
+        "../../weights/layer3.3.bn1.txt",
+        "../../weights/layer3.3.conv2.txt",
+        "../../weights/layer3.3.bn2.txt",
+        "../../weights/fc.weight.txt",
+        "../../weights/fc.bias.txt",
+    };
 
-    Ciphertext cipher_msg;
-    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
-
-    Ciphertext cipher_temp;
-    std::complex<double>* dec;
+    // Ciphertext* cipher_temp = SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
+    // std::complex<double>* dec;
 
     // timeutils.start("downsample row");
     // scheme.cipherDownsamplingRow(cipher_temp, cipher_msg, scheme, w, c);
@@ -161,25 +221,90 @@ int main(int argc, char **argv) {
     // w >>= 1;
     // timeutils.stop("downsample fast");
 
-    timeutils.start("conv fast");
-    heaan::numThreads = 1;
-
+    // long c = 3;
+    // long w = 8;
+    // complex<double>* mvec = new complex<double>[n]; // Dynamically allocate memory for the array
+    // for (int i = 0; i < c; i++)
+    //     for (int j = 0; j < w; j++)
+    //         for (int k = 0; k < w; k++)
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 64.0) - 0.5) * 2.0;
+    // print_shape(mvec, w, c, n);
+    // Ciphertext cipher_msg;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // std::complex<double>* dec;
+    // timeutils.start("conv 3x3 test");
+    // heaan::numThreads = 16;
     // double** weights = new double*[c];
     // for (int i = 0; i < c; i++) {
     //     weights[i] = new double[9];
-    //     for (int j = 0; j < 9; j++) {
-    //         weights[i][j] = (rand() % 1000) / 1000.0;
-    //         cout << setw(6) << weights[i][j] << " ";
-    //     }
+    //     double temp_weights[9] = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    //     std::copy(temp_weights, temp_weights + 9, weights[i]);
     //     cout << endl;
     // }
-    
-    cipherConv2dLayerFast_wrapper(cipher_temp, cipher_msg, scheme, w, c, c, "../../weights/layer1.0.conv1.txt");
-    // scheme.cipherConv3x3(cipher_temp, cipher_msg, weights, scheme, w, c);
-    timeutils.stop("conv fast");
+    // Ciphertext cipher_temp;
+    // // scheme.cipherConv3x3(cipher_temp, cipher_msg, weights, scheme, w, c);
+    // // scheme.cipherChannelSumAndEqual(cipher_temp, scheme, w, c, 1);
+    // double*** kernels = new double**[4];
+    // for (int i = 0; i < 4; i++)
+    // {
+    //     kernels[i] = new double*[3];
+    //     for (int j = 0; j < 3; j++)
+    //     {
+    //         kernels[i][j] = new double[9];
+    //         double temp_weights[9] = {0.1, 0.2, -0.3, 0.4, -0.5, 0.6, -0.7, 0.8, -0.9};
+    //         std::copy(temp_weights, temp_weights + 9, kernels[i][j]);
+    //     }
+    // }
+    // scheme.cipherConv2dLayer(cipher_temp, cipher_msg, kernels, scheme, w, 3, 4);
+    // SerializationUtils_::writeCiphertext(cipher_temp, "./temp/conv3x3.bin");
+    // timeutils.stop("conv 3x3 test");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, w, 4, n);
 
-    dec = scheme.decrypt(secretKey, cipher_temp);
-    print_shape(dec, w, c, n);
+
+    // double* img = new double[1024 * 3];
+    // int w, h, c;
+    // readImage("./luis.png", img, w, h, c);
+    // complex<double>* mvec = new complex<double>[n];
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * h + j * h + k] = (img[j * c * h + k * c + i] - 0.5) * 2.0; // Normalize the image and Adjust img[w, h, c] -> mvec[c, w, h]
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * h; i < n; i++) mvec[i] = 0;
+    // delete[] img;
+    // print_shape(mvec, 32, 3, n);
+    // Ciphertext cipher_msg;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast");
+    // heaan::numThreads = 16;
+    // Ciphertext cipher_temp;
+    // cipherConv2dLayer_wrapper(cipher_temp, cipher_msg, scheme, 32, 3, 16, "../../weights/conv1.txt");
+    // SerializationUtils_::writeCiphertext(cipher_temp, "./temp/conv1.bin");
+    // timeutils.stop("conv fast");
+    // std::complex<double>* dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 32, 16, n);
+
+
+    // Ciphertext* cipher_res = SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
+    // cipherBatchNormLayer_wrapper(*cipher_res, scheme, 32, 16, "../../weights/bn1.txt");
+    // scheme.cipherReLUAndEqual(*cipher_res, scheme);
+    // std::complex<double>* dec = scheme.decrypt(secretKey, *cipher_res);
+    // SerializationUtils_::writeCiphertext(*cipher_res, "./temp/layerInit.relu1.bin");
+    // print_shape(dec, 32, 16, n, "../../data/Layer0.txt");
+
+    Ciphertext* cipher_msg = SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    Ciphertext* cipher_res = new Ciphertext();
+    heaan::numThreads = 16;
+    *cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.1.bin");
+    // cipherConv2dLayerFast_wrapper(*cipher_res, *cipher_msg, scheme, 32, 16, 16, "../../weights/layer1.0.conv1.txt");
+    // basicBlock(*cipher_res, *cipher_msg, scheme, 32, 16, {"../../weights/layer1.0.conv1.txt", "../../weights/layer1.0.bn1.txt", "../../weights/layer1.0.conv2.txt", "../../weights/layer1.0.bn2.txt"});
+    // basicBlock(*cipher_res, *cipher_msg, scheme, 32, 16, {"../../weights/layer1.1.conv1.txt", "../../weights/layer1.1.bn1.txt", "../../weights/layer1.1.conv2.txt", "../../weights/layer1.1.bn2.txt"});
+    layer1(*cipher_res, *cipher_msg, scheme, paths);
+    std::complex<double>* dec = scheme.decrypt(secretKey, *cipher_res);
+    print_shape(dec, 32, 16, n, "../../data/Layer1.txt");
 
 	return 0;
 }
