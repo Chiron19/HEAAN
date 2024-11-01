@@ -8,120 +8,26 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <stdint.h>
 #include <iterator>
 #include <iomanip>
 #include <iostream>
+#include <complex>
 #include "Scheme.cpp"
 #include "SerializationUtils.cpp"
 #include "Layer.cpp"
+#include "FormatUtils.cpp"
 
-#include <stdint.h>
-
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#endif // !STB_IMAGE_IMPLEMENTATION
 
 using namespace std;
 using namespace NTL;
 using namespace heaan;
 
-void print_rep_img(double* dec0, long w) {
-    for (int i = 0; i < w * 4; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = w * w; i < w * (w + 4); i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = 2 * w * w; i < 2 * w * (w + 2); i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << endl;
-}
-
-void print_rep(complex<double>* dec0, long n) {
-    for (int i = 0; i < 10; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = n/2 - 5; i < n/2 + 5; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = n - 10; i < n; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1000 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << endl;
-}
-
-void print_shape(complex<double>* mvec, long w, long c) {
-    for (int i = 0; i < c; i++) {
-        for (int j = 0; j < w; j++) {
-            for (int k = 0; k < w; k++) {
-                cout << setw(9) << setprecision(3) << mvec[i * w * w + j * w + k].real() << ",";
-            }
-            cout << endl;
-        }
-        cout << endl;
-    }
-    cout << endl;
-}
-
-void print_res_classification(complex<double>* mvec) {
-    double max_val = -100;
-    int max_idx = -1;
-    for (int i = 0; i < 10; i++) {
-        cout << setw(8) << mvec[i * 64].real() << " ";
-        if (mvec[i * 64].real() > max_val) {
-            max_val = mvec[i * 64].real();
-            max_idx = i;
-        }
-    }
-    cout << endl;
-    cout << "Max value: " << max_val << " at index: " << max_idx << endl;
-}
-
-void readImage(string path, double*& image, int& w, int& h, int& c) {
-    uint8_t* rgb_image = stbi_load(path.c_str(), &w, &h, &c, 3);
-    for (int i = 0; i < w * h * c; i++) {
-        image[i] = static_cast<double>(rgb_image[i]) / 255.0;
-    }
-    stbi_image_free(rgb_image);
-}
-
-void generateSerialLeftRotKeys(std::set<long>& rotKeys, heaan::Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (heaan::SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
-    }
-}
-
-void generateSerialRightRotKeys(std::set<long>& rotKeys, heaan::Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (heaan::SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
-    }
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
-{
-    if (set.empty())
-        return out << "{}";
-    out << "{ " << *set.begin();
-    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
-    {
-        out << ", " << element;
-    });
-    return out << " }";
-}
-
 int main(int argc, char **argv) {
-    cout << "start" << endl;
     srand(time(NULL));
     SetNumThreads(16);
     
@@ -166,7 +72,7 @@ int main(int argc, char **argv) {
 
     // Parameters //
     // Total levels: logq / logp
-    long logq = 2100; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
+    long logq = 2400; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
     long logp = 20; ///< Scaling Factor (larger logp will give you more accurate value)
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
@@ -242,7 +148,8 @@ int main(int argc, char **argv) {
     timeutils.start("encrypt");
     Ciphertext cipher_msg;
     scheme.encrypt(cipher_msg, mvec, n, logp, logq);
-    print_rep(scheme.decrypt(secretKey, cipher_msg), cipher_msg.n);
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 1);
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 3, "../../data/img.txt");
     timeutils.stop("encrypt");
 
     heaan::numThreads = 16;
@@ -256,44 +163,59 @@ int main(int argc, char **argv) {
     }
     timeutils.stop("layerInit");
 
+    cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    print_shape(scheme.decrypt(secretKey, cipher_res), 32, 16, "../../data/Layer0.txt");
+
     timeutils.start("layer1");
     if (!SerializationUtils_::checkFile("./cipher/layer1.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
-        print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
+        print_shape(scheme.decrypt(secretKey, cipher_temp), 32, 1);
         layer1(cipher_res, cipher_temp, scheme, paths);
     }
     timeutils.stop("layer1");
 
-    heaan::numThreads = 16;
+    cipher_res = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
+    print_shape(scheme.decrypt(secretKey, cipher_res), 32, 16, "../../data/Layer1.txt");
+
+    heaan::numThreads = 32;
 
     timeutils.start("layer2");
     if (!SerializationUtils_::checkFile("./cipher/layer2.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
-        print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
+        print_shape(scheme.decrypt(secretKey, cipher_temp), 32, 1);
         layer2(cipher_res, cipher_temp, scheme, paths);
     }
     timeutils.stop("layer2");
 
-    heaan::numThreads = 16;
+    cipher_res = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
+    print_shape(scheme.decrypt(secretKey, cipher_res), 16, 32, "../../data/Layer2.txt");
+
+    heaan::numThreads = 64;
 
     timeutils.start("layer3");
     if (!SerializationUtils_::checkFile("./cipher/layer3.3.bin")) {
         cipher_temp = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
-        print_rep(scheme.decrypt(secretKey, cipher_temp), cipher_temp.n);
+        print_shape(scheme.decrypt(secretKey, cipher_temp), 16, 1);
         layer3(cipher_res, cipher_temp, scheme, paths);
     }
     timeutils.stop("layer3");
 
+    cipher_res = *SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
+    print_shape(scheme.decrypt(secretKey, cipher_res), 8, 64, "../../data/Layer3.txt");
+
     timeutils.start("layerEnd");
     if (!heaan::SerializationUtils_::checkFile("./cipher/layerEnd.linear.bin")) {
         cipher_temp = *heaan::SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
-        print_shape(scheme.decrypt(secretKey, cipher_temp), 8, 64);
+        print_shape(scheme.decrypt(secretKey, cipher_temp), 8, 1);
         layerEnd(cipher_res, cipher_temp, scheme, paths);
     }
     else {
         cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
     }
     timeutils.stop("layerEnd");
+
+    cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
+    print_shape(scheme.decrypt(secretKey, cipher_res), 8, 10, "../../data/LayerEnd.txt");
 
     timeutils.start("decrypt");
     complex<double>* dec0 = scheme.decrypt(secretKey, cipher_res);
@@ -304,6 +226,6 @@ int main(int argc, char **argv) {
 
     delete[] dec0;
     delete[] mvec;
-
-	return 0;
+    
+    return 0;
 }

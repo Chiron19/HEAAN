@@ -1,3 +1,6 @@
+#ifndef LAYER_CPP
+#define LAYER_CPP
+
 #include "../src/HEAAN.h"
 
 #include <NTL/BasicThreadPool.h>
@@ -5,6 +8,9 @@
 #include <set>
 #include <string>
 #include <iomanip>
+
+#include "Scheme.cpp"
+#include "SerializationUtils.cpp"
 
 using namespace std;
 using namespace NTL;
@@ -235,15 +241,15 @@ void cipherLinearLayer_wrapper(Ciphertext& cipher_res, Ciphertext& cipher_msg, S
 
 
 void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme, long w, long c, std::vector<string> paths) {
+    TimeUtils timeutils, timeutils_;
+    timeutils.start("basicBlock");
     bool skip = false;
-    cout << "basicBlock start" << endl;
-    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     
     if (!SerializationUtils_::checkFile("./cipher/block.conv1.bin")) {
+        timeutils_.start("block.conv1");
         cipherConv2dLayerFast_wrapper(cipher_res, cipher_msg, scheme, w, c, c, paths[0]);
+        timeutils_.stop("block.conv1");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.conv1.bin");
-        cout << "conv1 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -253,10 +259,10 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.conv1.bin");
             skip = false;
         }
+        timeutils_.start("block.bn1");
         cipherBatchNormLayer_wrapper(cipher_res, scheme, w, c, paths[1]);
+        timeutils_.stop("block.bn1");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.bn1.bin");
-        cout << "bn1 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -267,10 +273,10 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.bn1.bin");
             skip = false;
         }
-        scheme.cipherReLUAndEqual(cipher_res, scheme);
+        timeutils_.start("block.relu1");
+        scheme.cipherReLUAndEqual(cipher_res, scheme, 2);
+        timeutils_.stop("block.relu1");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.relu1.bin");
-        cout << "relu1 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -280,12 +286,12 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.relu1.bin");
             skip = false;
         }
+        timeutils_.start("block.conv2");
         Ciphertext cipher_temp(cipher_res);
         cipherConv2dLayerFast_wrapper(cipher_res, cipher_temp, scheme, w, c, c, paths[2]);
+        timeutils_.stop("block.conv2");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.conv2.bin");
         cipher_temp.free();
-        cout << "conv2 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -295,10 +301,10 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.conv2.bin");
             skip = false;
         }
+        timeutils_.start("block.bn2");
         cipherBatchNormLayer_wrapper(cipher_res, scheme, w, c, paths[3]);
+        timeutils_.stop("block.bn2");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.bn2.bin");
-        cout << "bn2 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -308,12 +314,12 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
             cipher_res = *SerializationUtils_::readCiphertext("./cipher/block.bn2.bin");
             skip = false;
         }
+        timeutils_.start("block.relu2");
         scheme.reScaleToAndEqual(cipher_msg, cipher_res.logq);
         scheme.addAndEqual(cipher_res, cipher_msg);
-        scheme.cipherReLUAndEqual(cipher_res, scheme);
+        scheme.cipherReLUAndEqual(cipher_res, scheme, 2);
+        timeutils_.stop("block.relu2");
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/block.relu2.bin");
-        cout << "relu2 done" << endl;
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     }
     
     SerializationUtils_::deleteFile("./cipher/block.conv1.bin");
@@ -322,7 +328,7 @@ void basicBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme,
     SerializationUtils_::deleteFile("./cipher/block.conv2.bin");
     SerializationUtils_::deleteFile("./cipher/block.bn2.bin");
     SerializationUtils_::deleteFile("./cipher/block.relu2.bin");
-    cout << "basicBlock end" << endl;
+    timeutils.stop("basicBlock");
 }
 
 void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme, long w, long c, std::vector<string> paths) {
@@ -330,14 +336,12 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
     Ciphertext cipher_temp;
     TimeUtils timeutils, timeutils_;
     timeutils.start("downsamplingBlock");
-    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     
     if (!SerializationUtils_::checkFile("./cipher/downsample.conv1.bin")) {
         timeutils_.start("downsample.conv1");
         cipherConv2dLayerFastDownsampling_wrapper(cipher_res, cipher_msg, scheme, w, c, paths[0]);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.conv1.bin");
         timeutils_.stop("downsample.conv1");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -351,7 +355,6 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
         cipherBatchNormLayer_wrapper(cipher_res, scheme, w, c, paths[1]);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.bn1.bin");
         timeutils_.stop("downsample.bn1");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -362,10 +365,9 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
             skip = false;
         }
         timeutils_.start("downsample.relu1");
-        scheme.cipherReLUAndEqual(cipher_res, scheme);
+        scheme.cipherReLUAndEqual(cipher_res, scheme, 2);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.relu1.bin");
         timeutils_.stop("downsample.relu1");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -380,7 +382,6 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
         cipherConv2dLayerFast_wrapper(cipher_res, cipher_temp, scheme, w, c, c, paths[2]);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.conv2.bin");
         timeutils_.stop("downsample.conv2");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;
     }
@@ -394,7 +395,6 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
         cipherBatchNormLayer_wrapper(cipher_res, scheme, w, c, paths[3]); 
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.bn2.bin");
         timeutils_.stop("downsample.bn2");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     } else {
         skip = true;    
     }
@@ -408,7 +408,6 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
         cipherConv2d1x1LayerFastDownsampling_wrapper(cipher_temp, cipher_msg, scheme, w, c, paths[4]);
         SerializationUtils_::writeCiphertext(cipher_temp, "./cipher/downsample.conv3.bin");
         timeutils_.stop("downsample.conv3");
-        cout << "cipher_temp: " << cipher_temp.n << ", " << cipher_temp.logp << ", " << cipher_temp.logq << endl;
     } else {
         skip = true;
     }
@@ -422,7 +421,6 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
         cipherBatchNormLayer_wrapper(cipher_temp, scheme, w, c, paths[5]);
         SerializationUtils_::writeCiphertext(cipher_temp, "./cipher/downsample.bn3.bin");
         timeutils_.stop("downsample.bn3");
-        cout << "cipher_temp: " << cipher_temp.n << ", " << cipher_temp.logp << ", " << cipher_temp.logq << endl;
     } else {
         skip = true;
     }
@@ -434,11 +432,11 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
             skip = false;
         }
         timeutils_.start("downsample.relu2");
+        scheme.reScaleToAndEqual(cipher_temp, cipher_res.logq);
         scheme.addAndEqual(cipher_res, cipher_temp);
-        scheme.cipherReLUAndEqual(cipher_res, scheme);
+        scheme.cipherReLUAndEqual(cipher_res, scheme, 2);
         SerializationUtils_::writeCiphertext(cipher_res, "./cipher/downsample.relu2.bin");
         timeutils_.stop("downsample.relu2");
-        cout << "cipher_res: " << cipher_res.n << ", " << cipher_res.logp << ", " << cipher_res.logq << endl;
     }
 
     cipher_temp.free();
@@ -454,23 +452,33 @@ void downsamplingBlock(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& 
 }
 
 void layerInit(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme, std::vector<string>& paths) {
+    bool skip = false;
     TimeUtils timeutils, timeutils_;
     timeutils.start("layerInit");
     
-    timeutils_.start("layerInit.conv1");
-    cipherConv2dLayer_wrapper(cipher_res, cipher_msg, scheme, 32, 3, 16, paths[0]);
-    SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.conv1.bin");
-    timeutils_.stop("layerInit.conv1");
+    if (!SerializationUtils_::checkFile("./cipher/layerInit.conv1.bin")) {
+        timeutils_.start("layerInit.conv1");
+        cipherConv2dLayer_wrapper(cipher_res, cipher_msg, scheme, 32, 3, 16, paths[0]);
+        SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.conv1.bin");
+        timeutils_.stop("layerInit.conv1");
+    } else {
+        skip = true;
+    }
 
-    timeutils_.start("layerInit.bn1");
-    cipherBatchNormLayer_wrapper(cipher_res, scheme, 32, 16, paths[1]);
-    SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.bn1.bin");
-    timeutils_.stop("layerInit.bn1");
+    if (!SerializationUtils_::checkFile("./cipher/layerInit.bn1.bin")) {
+        if (skip) {
+            cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
+        }
+        timeutils_.start("layerInit.bn1");
+        cipherBatchNormLayer_wrapper(cipher_res, scheme, 32, 16, paths[1]);
+        SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.bn1.bin");
+        timeutils_.stop("layerInit.bn1");
 
-    timeutils_.start("layerInit.relu1");
-    scheme.cipherReLUAndEqual(cipher_res, scheme);
-    SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.relu1.bin");
-    timeutils_.stop("layerInit.relu1");
+        timeutils_.start("layerInit.relu1");
+        scheme.cipherReLUAndEqual(cipher_res, scheme, 2);
+        SerializationUtils::writeCiphertext(cipher_res, "./cipher/layerInit.relu1.bin");
+        timeutils_.stop("layerInit.relu1");
+    }
     
     timeutils.stop("layerInit");
 }
@@ -637,3 +645,5 @@ void layerEnd(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_& scheme, s
 }
 
 } // namespace heaan
+
+#endif // !LAYER_CPP

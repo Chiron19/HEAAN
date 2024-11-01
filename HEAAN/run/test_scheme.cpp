@@ -14,95 +14,18 @@
 #include "Scheme.cpp"
 #include "SerializationUtils.cpp"
 #include "Layer.cpp"
+#include "FormatUtils.cpp"
 
 #include <stdint.h>
 
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#endif // !STB_IMAGE_IMPLEMENTATION
 
 using namespace std;
 using namespace NTL;
 using namespace heaan;
-
-void print_shape(complex<double>* mvec, long w, long c, long n, std::string dir="") {
-    if (dir != "") {
-        ofstream file(dir);
-        if (!file.is_open()) {
-            cout << "Cannot open file " << dir << endl;
-            return;
-        }
-        for (int i = 0; i < c; i++) {
-            for (int j = 0; j < w; j++) {
-                for (int k = 0; k < w; k++) {
-                    file << setw(8) << setprecision(4) << mvec[i * w * w + j * w + k].real() << " ";
-                }
-                file << endl;
-            }
-            file << endl;
-        }
-        file << endl;
-        cout << "Saved to " << dir << endl;
-        file.close();
-    } else {
-        for (int i = 0; i < c; i++) {
-            for (int j = 0; j < w; j++) {
-                for (int k = 0; k < w; k++) {
-                    cout << setw(8) << setprecision(4) << mvec[i * w * w + j * w + k].real() << " ";
-                }
-                cout << endl;
-            }
-            cout << endl;
-        }
-        cout << endl;
-    }
-}
-
-void print_res_classification(complex<double>* mvec) {
-    for (int i = 0; i < 10; i++) {
-        cout << setw(8) << mvec[i * 64].real() << endl;
-    }
-    cout << endl;
-}
-
-void print_res_pool(complex<double>* mvec) {
-    for (int i = 0; i < 64; i++) {
-        cout << setw(8) << mvec[i * 64].real() << endl;
-    }
-    cout << endl;
-}
-
-void readImage(string path, double*& image, int& w, int& h, int& c) {
-    uint8_t* rgb_image = stbi_load(path.c_str(), &w, &h, &c, 3);
-    for (int i = 0; i < w * h * c; i++) {
-        image[i] = static_cast<double>(rgb_image[i]) / 255.0;
-    }
-    stbi_image_free(rgb_image);
-}
-
-void generateSerialLeftRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i, path);
-    }
-}
-
-void generateSerialRightRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i, path);
-    }
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
-{
-    if (set.empty())
-        return out << "{}";
-    out << "{ " << *set.begin();
-    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
-    {
-        out << ", " << element;
-    });
-    return out << " }";
-}
 
 int main(int argc, char **argv) {
     cout << "start" << endl;
@@ -275,7 +198,7 @@ int main(int argc, char **argv) {
     // }
     // for (int i = c * w * h; i < n; i++) mvec[i] = 0;
     // delete[] img;
-    // print_shape(mvec, 32, 3, n);
+    // print_shape(mvec, 32, 3);
     // Ciphertext cipher_msg;
     // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
     // timeutils.start("conv fast");
@@ -295,16 +218,153 @@ int main(int argc, char **argv) {
     // SerializationUtils_::writeCiphertext(*cipher_res, "./temp/layerInit.relu1.bin");
     // print_shape(dec, 32, 16, n, "../../data/Layer0.txt");
 
-    Ciphertext* cipher_msg = SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
-    Ciphertext* cipher_res = new Ciphertext();
-    heaan::numThreads = 16;
-    *cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.1.bin");
+    // Ciphertext* cipher_msg = SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    // Ciphertext* cipher_res = new Ciphertext();
+    // heaan::numThreads = 16;
+    // *cipher_res = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    // scheme.cipherReLUAndEqual(*cipher_res, scheme);
     // cipherConv2dLayerFast_wrapper(*cipher_res, *cipher_msg, scheme, 32, 16, 16, "../../weights/layer1.0.conv1.txt");
     // basicBlock(*cipher_res, *cipher_msg, scheme, 32, 16, {"../../weights/layer1.0.conv1.txt", "../../weights/layer1.0.bn1.txt", "../../weights/layer1.0.conv2.txt", "../../weights/layer1.0.bn2.txt"});
     // basicBlock(*cipher_res, *cipher_msg, scheme, 32, 16, {"../../weights/layer1.1.conv1.txt", "../../weights/layer1.1.bn1.txt", "../../weights/layer1.1.conv2.txt", "../../weights/layer1.1.bn2.txt"});
-    layer1(*cipher_res, *cipher_msg, scheme, paths);
-    std::complex<double>* dec = scheme.decrypt(secretKey, *cipher_res);
-    print_shape(dec, 32, 16, n, "../../data/Layer1.txt");
+    // layer1(*cipher_res, *cipher_msg, scheme, paths);
+    // downsamplingBlock(*cipher_res, *cipher_msßg, scheme, 16, 32, {"../../weights/layer2.0.conv1.txt", "../../weights/layer2.0.bn1.txt", "../../weights/layer2.0.conv2.txt", "../../weights/layer2.0.bn2.txt", "../../weights/layer2.0.downsample.0.txt", "../../weights/layer2.0.downsample.1.txt"});
+    // SerializationUtils_::writeCiphertext(*cipher_res, "./cipher/layer2.0.bin");
+    // std::complex<double>* dec = scheme.decrypt(secretKey, *cipher_res);
+    // print_shape(dec, 32, 16, n, "../../data/relu.txt");
+
+    heaan::numThreads = 16;
+    complex<double>* mvec = new complex<double>[n];
+    Ciphertext cipher_msg;
+    Ciphertext cipher_temp;
+    std::complex<double>* dec;
+    int c = 3, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv");
+    // cipherConv2dLayer_wrapper(cipher_temp, cipher_msg, scheme, 32, 3, 16, "../../weights/conv1.txt");
+    // timeutils.stop("conv");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 32, 16, "../../data/conv2d.txt");
+
+    // c = 16, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast");
+    // cipherConv2dLayerFast_wrapper(cipher_temp, cipher_msg, scheme, 32, 16, 16, "../../weights/layer1.0.conv1.txt");
+    // timeutils.stop("conv fast");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 32, 16, "../../data/conv2dfast.txt");
+
+    // c = 16, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast downsample");
+    // cipherConv2dLayerFastDownsampling_wrapper(cipher_temp, cipher_msg, scheme, 16, 32, "../../weights/layer2.0.conv1.txt");
+    // timeutils.stop("conv fast downsample");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 16, 32, "../../data/conv2dfastdownsample.txt");
+
+    // c = 16, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("bn");
+    // cipherBatchNormLayer_wrapper(cipher_msg, scheme, 32, 16, "../../weights/bn1.txt");
+    // timeutils.stop("bn");
+    // dec = scheme.decrypt(secretKey, cipher_msg);
+    // print_shape(dec, 32, 16, "../../data/bn.txt");
+
+    c = 16, w = 32;
+    for (int i = 0; i < c; i++) {
+        for (int j = 0; j < w; j++) {
+            for (int k = 0; k < w; k++) {
+                mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
+            }
+        }
+    }
+    for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    timeutils.start("relu");
+    scheme.cipherReLUAndEqual(cipher_msg, scheme, 1);
+    timeutils.stop("relu");
+    dec = scheme.decrypt(secretKey, cipher_msg);
+    print_shape(dec, 32, 16, "../../data/relu1.txt");
+
+    c = 16, w = 32;
+    for (int i = 0; i < c; i++) {
+        for (int j = 0; j < w; j++) {
+            for (int k = 0; k < w; k++) {
+                mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
+            }
+        }
+    }
+    for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    timeutils.start("relu");
+    scheme.cipherReLUAndEqual(cipher_msg, scheme, 2);
+    timeutils.stop("relu");
+    dec = scheme.decrypt(secretKey, cipher_msg);
+    print_shape(dec, 32, 16, "../../data/relu2.txt");
+
+    // c = 64, w = 8;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = ((i * (j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("avg pool");
+    // scheme.cipherAvgPoolingAndEqual(cipher_msg, scheme, 8, 64);
+    // timeutils.stop("avg pool");
+    // dec = scheme.decrypt(secretKey, cipher_msg);
+    // print_shape(dec, 8, 64, "../../data/pool.txt");
+
+    // c = 64, w = 8;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = ((i * (j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // print_res_classification(scheme.decrypt(secretKey, cipher_msg));
+    // timeutils.start("linear");
+    // cipherLinearLayer_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, 10, "../../weights/fc.weight.txt", "../../weights/fc.bias.txt");
+    // timeutils.stop("linear");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_res_classification(dec);
 
 	return 0;
 }

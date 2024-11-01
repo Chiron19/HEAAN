@@ -12,6 +12,8 @@ HEAAN/lib/*.a
 
 weights
 
+cifar*
+
 data
 
 *.d

@@ -1,3 +1,6 @@
+#ifndef SCHEME_CPP
+#define SCHEME_CPP
+
 #include "../src/HEAAN.h"
 
 #include <NTL/BasicThreadPool.h>
@@ -45,7 +48,7 @@ void cipherDownsamplingChannelFast(Ciphertext& cipher_res, Ciphertext& cipher_ms
 void cipherDownsamplingFast(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
 void cipherBatchNormLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
 void cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
-void cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme);
+void cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long opt=0);
 void cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
 void cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme_ &scheme, long w, long c_in, long c_out);
 
@@ -572,7 +575,7 @@ void Scheme_::cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Cipherte
         // cout << "thread " << i << " done" << endl;
     }
 
-    for (long i = 0; i < c_in; i++) {
+    for (long i = 0; i < c_out; i++) {
         if (i == 0) {
             cipher_res.copy(cipher_conv[i]);
         } else {
@@ -991,28 +994,34 @@ void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &sche
  * @param cipher_msg 
  * @param scheme 
  * 
- * Consumed Level: 1
+ * Consumed Level: 1 or 4
  * 
- * f(x) = x^2
+ * f(x) = x^2 or Chebyshev Polynomial Approximation
  */
-void Scheme_::cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme) {
+void Scheme_::cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long opt) {
     long logp = cipher_msg.logp;
-    Ciphertext cipher_temp;
-    scheme.square(cipher_temp, cipher_msg);
-    scheme.reScaleBy(cipher_msg, cipher_temp, logp);
+    Ciphertext cipher_temp(cipher_msg);
+    string function_name;
 
+    switch (opt)
+    {
+    case 1:
+        function_name = "Relu_1";
+        SchemeAlgo(scheme).function(cipher_msg, cipher_temp, function_name, logp, 7);
+        break;
+    
+    case 2:
+        function_name = "Relu_2";
+        SchemeAlgo(scheme).function(cipher_msg, cipher_temp, function_name, logp, 7);
+        break;
+    
+    default:
+        scheme.squareAndEqual(cipher_msg);
+        scheme.reScaleByAndEqual(cipher_msg, logp);
+        break;
+    }
+    
     cipher_temp.free();
-    // scheme.addAndEqual(cipher_msg, cipher_temp);
-    // Ciphertext cipher_relu;
-    // cipher_relu.copyParams(cipher_msg);
-    // SchemeAlgo schemeAlgo(scheme);
-    // long logp = cipher_msg.logp;
-    // schemeAlgo.function(cipher_relu, cipher_msg, SIGMOID, logp, 4);
-    // scheme.multAndEqual(cipher_relu, cipher_msg);
-    // cipher_msg.copy(cipher_relu);
-    // scheme.reScaleByAndEqual(cipher_msg, logp);
-    // cout << "cipherReLUAndEqual end: " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    // cipher_relu.free();
 }
 
 /**
@@ -1064,41 +1073,49 @@ void Scheme_::cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, 
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
     complex<double>* mvec = new complex<double>[n];
+    Ciphertext* cipher_sum = new Ciphertext[c_out];
     Ciphertext cipher_temp;
-    Ciphertext cipher_sum;
+
     for (long i = 0; i < c_out; i++) {
-        cipher_temp.copy(cipher_msg);
         packWeights(mvec, n, weights[i], w, c_in);
-        scheme.multByConstVecAndEqual(cipher_temp, mvec, logp);
-        scheme.reScaleByAndEqual(cipher_temp, logp);
+        scheme.multByConstVec(cipher_sum[i], cipher_msg, mvec, logp);
+        scheme.reScaleByAndEqual(cipher_sum[i], logp);
+
+        for (int j = c_in / 2; j > 0; j >>= 1) {
+            scheme.leftRotateFast(cipher_temp, cipher_sum[i], j * w * w);
+            scheme.addAndEqual(cipher_sum[i], cipher_temp);
+        }
 
         for (int j = 1; j <= i; j <<= 1) {
             if (j & i) {
-                scheme.rightRotateFastAndEqual(cipher_temp, j * w * w);
+                scheme.rightRotateFastAndEqual(cipher_sum[i], j * w * w);
             }
         }
-        cipher_sum.copy(cipher_temp);
-        for (int j = c_in / 2; j > 0; j >>= 1) {
-            scheme.leftRotateFastAndEqual(cipher_temp, j * w * w);
-            scheme.addAndEqual(cipher_sum, cipher_temp);
-            cipher_temp.copy(cipher_sum);
-        }
+
         maskSlot(mvec, n, w, i);
-        scheme.multByConstVecAndEqual(cipher_sum, mvec, logp);
-        scheme.reScaleByAndEqual(cipher_sum, logp);
-        if (i == 0) {
-            cipher_res.copy(cipher_sum);
-        } else {
-            scheme.addAndEqual(cipher_res, cipher_sum);
-        }
+        scheme.multByConstVecAndEqual(cipher_sum[i], mvec, logp);
     }
-    packConst(mvec, n, bias, w, c_out);
-    scheme.encrypt(cipher_temp, mvec, n, logp, logq);
+
+    cipher_res.copy(cipher_sum[0]);
+    for (int i = 1; i < c_out; i++)
+    {
+        scheme.addAndEqual(cipher_res, cipher_sum[i]);
+    }
+    scheme.reScaleByAndEqual(cipher_res, logp);
+    
+    packWeights(mvec, n, bias, w, c_out);
+    scheme.encrypt(cipher_temp, mvec, n, logp, logq - logp * 2);
     scheme.addAndEqual(cipher_res, cipher_temp);
 
     cipher_temp.free();
-    cipher_sum.free();
+    for (int i = 0; i < c_out; i++)
+    {
+        cipher_sum[i].free();
+    }
+    delete[] cipher_sum;
     delete[] mvec;
 }
 
 } // namespace heaan
+
+#endif // !SCHEME_CPP

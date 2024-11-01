@@ -1,3 +1,6 @@
+#ifndef SERIALIZATIONUTILS_CPP
+#define SERIALIZATIONUTILS_CPP
+
 #include "../src/HEAAN.h"
 
 #include <sys/stat.h>
@@ -108,3 +111,5 @@ static bool checkRightRotKey(Scheme &scheme, long r, string dir="./serkey") {
 };
 
 }  // namespace heaan
+
+#endif // !SERIALIZATIONUTILS_CPP

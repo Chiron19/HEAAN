@@ -14,112 +14,18 @@
 #include "Scheme.cpp"
 #include "SerializationUtils.cpp"
 #include "Layer.cpp"
+#include "FormatUtils.cpp"
 
 #include <stdint.h>
 
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#endif // !STB_IMAGE_IMPLEMENTATION
 
 using namespace std;
 using namespace NTL;
 using namespace heaan;
-
-void print_rep_img(double* dec0, long w) {
-    for (int i = 0; i < w * 4; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = w * w; i < w * (w + 4); i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = 2 * w * w; i < 2 * w * (w + 2); i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i] * 1000)) / 1000;
-        if ((i + 1) % w == 0) cout << endl;
-    }
-    cout << endl;
-}
-
-void print_rep(complex<double>* dec0, long n) {
-    for (int i = 0; i < 100; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1e9 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = n/2-5; i < n/2 + 5; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1e9 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << " ... " << endl;
-    for (int i = n - 5; i < n; i++) {
-        cout << setw(6) << setprecision(3) << double(int(dec0[i].real() * 1000)) / 1e9 << "," << setw(6) << double(int(dec0[i].imag() * 1000)) / 1000 << "  ";
-        if ((i + 1) % 5 == 0) cout << endl;
-    }
-    cout << endl;
-}
-
-void print_shape(complex<double>* mvec, long w, long c, long n) {
-    for (int i = 0; i < c; i++) {
-        for (int j = 0; j < w; j++) {
-            for (int k = 0; k < w; k++) {
-                cout << setw(6) << mvec[i * w * w + j * w + k].real();
-            }
-            cout << endl;
-        }
-        cout << endl;
-        cout << endl;
-    }
-    cout << endl;
-}
-
-void print_res_classification(complex<double>* mvec) {
-    for (int i = 0; i < 10; i++) {
-        cout << setw(8) << mvec[i * 64].real() << endl;
-    }
-    cout << endl;
-}
-
-void print_res_pool(complex<double>* mvec) {
-    for (int i = 0; i < 64; i++) {
-        cout << setw(8) << mvec[i * 64].real() << endl;
-    }
-    cout << endl;
-}
-
-void readImage(string path, double*& image, int& w, int& h, int& c) {
-    uint8_t* rgb_image = stbi_load(path.c_str(), &w, &h, &c, 3);
-    for (int i = 0; i < w * h * c; i++) {
-        image[i] = static_cast<double>(rgb_image[i]) / 255.0;
-    }
-    stbi_image_free(rgb_image);
-}
-
-void generateSerialLeftRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
-    }
-}
-
-void generateSerialRightRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
-    for (long i : rotKeys) {
-        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
-    }
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
-{
-    if (set.empty())
-        return out << "{}";
-    out << "{ " << *set.begin();
-    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
-    {
-        out << ", " << element;
-    });
-    return out << " }";
-}
 
 int main(int argc, char **argv) {
     cout << "start" << endl;
@@ -238,17 +144,58 @@ int main(int argc, char **argv) {
     };
 
     Ciphertext cipher_msg;
-    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
-    cout << "cipher_msg: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
-    
-    heaan::numThreads = 16;
-    timeutils.start("downsample.conv3");
-    Ciphertext cipher_temp;
-    cipherConv2d1x1LayerFastDownsampling_wrapper(cipher_temp, cipher_msg, scheme, 16, 32, paths[4]);
-    // SerializationUtils_::writeCiphertext(cipher_temp, "./cipher/downsample.conv3.bin");
-    timeutils.stop("downsample.conv3");
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
+    cout << "Layer Init conv: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layerInit.conv1.txt");
 
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.bn1.bin");
+    cout << "Layer Init bn: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layerInit.bn1.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerInit.relu1.bin");
+    cout << "Layer Init relu: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layerInit.relu1.txt");
+    
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.1.bin");
+    cout << "Layer1.1: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layer1.1.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.2.bin");
+    cout << "Layer1.2: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layer1.2.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer1.3.bin");
+    cout << "Layer1.3: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 32, 16, "../../data/layer1.3.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.1.bin");
+    cout << "Layer2.1: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 16, 32, "../../data/layer2.1.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.2.bin");
+    cout << "Layer2.2: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 16, 32, "../../data/layer2.2.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
+    cout << "Layer2.3: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 16, 32, "../../data/layer2.3.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.1.bin");
+    cout << "Layer3.1: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 8, 64, "../../data/layer3.1.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.2.bin");
+    cout << "Layer3.2: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 8, 64, "../../data/layer3.2.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layer3.3.bin");
+    cout << "Layer3.3: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
+    print_shape(scheme.decrypt(secretKey, cipher_msg), 8, 64, "../../data/layer3.3.txt");
+
+    cipher_msg = *SerializationUtils_::readCiphertext("./cipher/layerEnd.linear.bin");
+    cout << "Layer End: " << cipher_msg.n << ", " << cipher_msg.logp << ", " << cipher_msg.logq << endl;
     std::complex<double>* dec = scheme.decrypt(secretKey, cipher_msg);
     print_res_classification(dec);
+
 	return 0;
 }
