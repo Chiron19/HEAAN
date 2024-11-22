@@ -27,9 +27,22 @@ using namespace std;
 using namespace NTL;
 using namespace heaan;
 
+template<typename T>
+std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
+{
+    if (set.empty())
+        return out << "{}";
+    out << "{ " << *set.begin();
+    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
+    {
+        out << ", " << element;
+    });
+    return out << " }";
+}
+
 int main(int argc, char **argv) {
     cout << "start" << endl;
-    srand(time(NULL));
+    // srand(time(NULL));
     SetNumThreads(16);
     TimeUtils timeutils;
     Ring ring;
@@ -55,22 +68,22 @@ int main(int argc, char **argv) {
     };
     std::set<long> leftRotKeys;
     std::set<long> rightRotKeys;
-    rotKeysRequirement(leftRotKeys, rightRotKeys, params);
+    SerializationUtils_::rotKeysRequirement(leftRotKeys, rightRotKeys, params);
     cout << "leftRotKeys : " << leftRotKeys << endl;
     cout << "rightRotKeys: " << rightRotKeys << endl;
 
     // leftRotKeys.insert({8, 64});
     // rightRotKeys.insert({8, 64});
 
-    generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
-    generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
     
     cout << "key done" << endl;
 
     // Parameters //
-    // Total levels: logq / logp = 80
-    long logq = 1760; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
-    long logp = 20; ///< Scaling Factor (larger logp will give you more accurate value)
+    // Total levels: logq / logp
+    long logq = 320; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
+    long logp = 16; ///< Scaling Factor (larger logp will give you more accurate value)
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
     long slots = n;
@@ -128,6 +141,11 @@ int main(int argc, char **argv) {
 
     // Ciphertext* cipher_temp = SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
     // std::complex<double>* dec;
+    // dec = scheme.decrypt(secretKey, *cipher_temp);
+    // for (int i = 0; i < N; i++)
+    //     if (secretKey.sx[i] != 0)  cout << i << endl;
+    // cout << dec[0] << endl;
+    // print_shape(dec, 32, 1);
 
     // timeutils.start("downsample row");
     // scheme.cipherDownsamplingRow(cipher_temp, cipher_msg, scheme, w, c);
@@ -205,10 +223,10 @@ int main(int argc, char **argv) {
     // heaan::numThreads = 16;
     // Ciphertext cipher_temp;
     // cipherConv2dLayer_wrapper(cipher_temp, cipher_msg, scheme, 32, 3, 16, "../../weights/conv1.txt");
-    // SerializationUtils_::writeCiphertext(cipher_temp, "./temp/conv1.bin");
+    // SerializationUtils_::writeCiphertext(cipher_temp, "./cipher/conv1.bin");
     // timeutils.stop("conv fast");
     // std::complex<double>* dec = scheme.decrypt(secretKey, cipher_temp);
-    // print_shape(dec, 32, 16, n);
+    // print_shape(dec, 32, 1);
 
 
     // Ciphertext* cipher_res = SerializationUtils_::readCiphertext("./cipher/layerInit.conv1.bin");
@@ -250,8 +268,10 @@ int main(int argc, char **argv) {
     // timeutils.start("conv");
     // cipherConv2dLayer_wrapper(cipher_temp, cipher_msg, scheme, 32, 3, 16, "../../weights/conv1.txt");
     // timeutils.stop("conv");
+    // SerializationUtils_::writeCiphertext(cipher_temp, "./cipher/layerInit.conv1.bin");
     // dec = scheme.decrypt(secretKey, cipher_temp);
-    // print_shape(dec, 32, 16, "../../data/conv2d.txt");
+    // print_shape(dec, 32, 1);
+    // print_shape(dec, 32, 16, "../../data/conv2d_.txt");
 
     // c = 16, w = 32;
     // for (int i = 0; i < c; i++) {
@@ -264,10 +284,51 @@ int main(int argc, char **argv) {
     // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
     // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
     // timeutils.start("conv fast");
+    // SerializationUtils_::checkSerialDirectory("./cipher");
     // cipherConv2dLayerFast_wrapper(cipher_temp, cipher_msg, scheme, 32, 16, 16, "../../weights/layer1.0.conv1.txt");
+    // cout << cipher_temp.n << " " << cipher_temp.logp << " " << cipher_temp.logq << endl;
+    // cout << cipher_temp.ax[0] << " " << cipher_temp.bx[0] << endl;
     // timeutils.stop("conv fast");
     // dec = scheme.decrypt(secretKey, cipher_temp);
-    // print_shape(dec, 32, 16, "../../data/conv2dfast.txt");
+    // print_shape(dec, 32, 16, "../../data/conv2dfast1_.txt");
+
+    // c = 32, w = 16;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast");
+    // SerializationUtils_::checkSerialDirectory("./cipher");
+    // cipherConv2dLayerFast_wrapper(cipher_temp, cipher_msg, scheme, 16, 32, 32, "../../weights/layer2.1.conv1.txt");
+    // cout << cipher_temp.n << " " << cipher_temp.logp << " " << cipher_temp.logq << endl;
+    // cout << cipher_temp.ax[0] << " " << cipher_temp.bx[0] << endl;
+    // timeutils.stop("conv fast");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 16, 32, "../../data/conv2dfast2_.txt");
+
+    // c = 64, w = 8;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast");
+    // SerializationUtils_::checkSerialDirectory("./cipher");
+    // cipherConv2dLayerFast_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, 64, "../../weights/layer3.1.conv1.txt");
+    // cout << cipher_temp.n << " " << cipher_temp.logp << " " << cipher_temp.logq << endl;
+    // cout << cipher_temp.ax[0] << " " << cipher_temp.bx[0] << endl;
+    // timeutils.stop("conv fast");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 8, 64, "../../data/conv2dfast3_.txt");
 
     // c = 16, w = 32;
     // for (int i = 0; i < c; i++) {
@@ -283,7 +344,23 @@ int main(int argc, char **argv) {
     // cipherConv2dLayerFastDownsampling_wrapper(cipher_temp, cipher_msg, scheme, 16, 32, "../../weights/layer2.0.conv1.txt");
     // timeutils.stop("conv fast downsample");
     // dec = scheme.decrypt(secretKey, cipher_temp);
-    // print_shape(dec, 16, 32, "../../data/conv2dfastdownsample.txt");
+    // print_shape(dec, 16, 32, "../../data/conv2dfastdownsample1_.txt");
+
+    // c = 32, w = 16;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.0;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("conv fast downsample");
+    // cipherConv2dLayerFastDownsampling_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, "../../weights/layer3.0.conv1.txt");
+    // timeutils.stop("conv fast downsample");
+    // dec = scheme.decrypt(secretKey, cipher_temp);
+    // print_shape(dec, 8, 64, "../../data/conv2dfastdownsample2_.txt");
 
     // c = 16, w = 32;
     // for (int i = 0; i < c; i++) {
@@ -299,40 +376,40 @@ int main(int argc, char **argv) {
     // cipherBatchNormLayer_wrapper(cipher_msg, scheme, 32, 16, "../../weights/bn1.txt");
     // timeutils.stop("bn");
     // dec = scheme.decrypt(secretKey, cipher_msg);
-    // print_shape(dec, 32, 16, "../../data/bn.txt");
+    // print_shape(dec, 32, 16, "../../data/bn_.txt");
 
-    c = 16, w = 32;
-    for (int i = 0; i < c; i++) {
-        for (int j = 0; j < w; j++) {
-            for (int k = 0; k < w; k++) {
-                mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
-            }
-        }
-    }
-    for (int i = c * w * w; i < n; i++) mvec[i] = 0;
-    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
-    timeutils.start("relu");
-    scheme.cipherReLUAndEqual(cipher_msg, scheme, 1);
-    timeutils.stop("relu");
-    dec = scheme.decrypt(secretKey, cipher_msg);
-    print_shape(dec, 32, 16, "../../data/relu1.txt");
+    // c = 16, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("relu");
+    // scheme.cipherReLUAndEqual(cipher_msg, scheme, 1);
+    // timeutils.stop("relu");
+    // dec = scheme.decrypt(secretKey, cipher_msg);
+    // print_shape(dec, 32, 16, "../../data/relu1.txt");
 
-    c = 16, w = 32;
-    for (int i = 0; i < c; i++) {
-        for (int j = 0; j < w; j++) {
-            for (int k = 0; k < w; k++) {
-                mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
-            }
-        }
-    }
-    for (int i = c * w * w; i < n; i++) mvec[i] = 0;
-    scheme.encrypt(cipher_msg, mvec, n, logp, logq);
-    timeutils.start("relu");
-    scheme.cipherReLUAndEqual(cipher_msg, scheme, 2);
-    timeutils.stop("relu");
-    dec = scheme.decrypt(secretKey, cipher_msg);
-    print_shape(dec, 32, 16, "../../data/relu2.txt");
-
+    // c = 16, w = 32;
+    // for (int i = 0; i < c; i++) {
+    //     for (int j = 0; j < w; j++) {
+    //         for (int k = 0; k < w; k++) {
+    //             mvec[i * w * w + j * w + k] = (((j * w + k) / 1024.0) - 0.5) * 2.3;
+    //         }
+    //     }
+    // }
+    // for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+    // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+    // timeutils.start("relu");
+    // scheme.cipherReLUAndEqual(cipher_msg, scheme, 2);
+    // timeutils.stop("relu");
+    // dec = scheme.decrypt(secretKey, cipher_msg);
+    // print_shape(dec, 32, 16, "../../data/relu2.txt");
+    
     // c = 64, w = 8;
     // for (int i = 0; i < c; i++) {
     //     for (int j = 0; j < w; j++) {
@@ -347,7 +424,7 @@ int main(int argc, char **argv) {
     // scheme.cipherAvgPoolingAndEqual(cipher_msg, scheme, 8, 64);
     // timeutils.stop("avg pool");
     // dec = scheme.decrypt(secretKey, cipher_msg);
-    // print_shape(dec, 8, 64, "../../data/pool.txt");
+    // print_shape(dec, 8, 64, "../../data/pool_.txt");
 
     // c = 64, w = 8;
     // for (int i = 0; i < c; i++) {
@@ -365,6 +442,40 @@ int main(int argc, char **argv) {
     // timeutils.stop("linear");
     // dec = scheme.decrypt(secretKey, cipher_temp);
     // print_res_classification(dec);
+
+    for (int v = 1; v <=10; v++) {
+        srand(v);
+        c = 64, w = 8;
+        string str = "../../data/input_" + to_string(v) + ".txt";
+        istream* is = new ifstream(str);
+        for (int i = 0; i < c; i++) {
+            for (int j = 0; j < w; j++) {
+                for (int k = 0; k < w; k++) {
+                    *is >> mvec[i * w * w + j * w + k];
+                }
+            }
+        }
+        for (int i = c * w * w; i < n; i++) mvec[i] = 0;
+        complex<double>* mvec1 = new complex<double>[n];
+        memccpy(mvec1, mvec, n, sizeof(complex<double>));
+        // string str = "../../data/input_" + to_string(v) + ".txt";
+        // print_shape(mvec, 8, 64, str);
+        scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+        timeutils.start("avg pool");
+        scheme.cipherAvgPoolingAndEqual(cipher_msg, scheme, 8, 64);
+        timeutils.stop("avg pool");
+        dec = scheme.decrypt(secretKey, cipher_msg);
+        str = "../../data/pool" + to_string(v) + ".txt";
+        print_shape(dec, 8, 64, str);
+        // scheme.encrypt(cipher_msg, mvec, n, logp, logq);
+        // cipher_temp.free();
+        // timeutils.start("linear");
+        // cipherLinearLayer_wrapper(cipher_temp, cipher_msg, scheme, 8, 64, 10, "../../weights/fc.weight.txt", "../../weights/fc.bias.txt");
+        // timeutils.stop("linear");
+        // dec = scheme.decrypt(secretKey, cipher_temp);
+        // print_res_classification(dec);
+    }
+    
 
 	return 0;
 }

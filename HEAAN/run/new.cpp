@@ -27,6 +27,19 @@ using namespace std;
 using namespace NTL;
 using namespace heaan;
 
+template<typename T>
+std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
+{
+    if (set.empty())
+        return out << "{}";
+    out << "{ " << *set.begin();
+    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
+    {
+        out << ", " << element;
+    });
+    return out << " }";
+}
+
 int main(int argc, char **argv) {
     srand(time(NULL));
     SetNumThreads(16);
@@ -61,19 +74,19 @@ int main(int argc, char **argv) {
     };
     std::set<long> leftRotKeys;
     std::set<long> rightRotKeys;
-    rotKeysRequirement(leftRotKeys, rightRotKeys, params);
+    SerializationUtils_::rotKeysRequirement(leftRotKeys, rightRotKeys, params);
     cout << "leftRotKeys : " << leftRotKeys << endl;
     cout << "rightRotKeys: " << rightRotKeys << endl;
 
-    generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
-    generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
     
     timeutils.stop("key generation");
 
     // Parameters //
     // Total levels: logq / logp
-    long logq = 2400; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
-    long logp = 20; ///< Scaling Factor (larger logp will give you more accurate value)
+    long logq = 6000; ///< Ciphertext modulus (this value should be <= logQ in "scr/Params.h")
+    long logp = 30; ///< Scaling Factor (larger logp will give you more accurate value)
     long logn = 14; ///< number of slot is 2^logn (this value should be < logN in "src/Params.h")
     long n = 1 << logn;
     long slots = n;
@@ -190,7 +203,7 @@ int main(int argc, char **argv) {
     cipher_res = *SerializationUtils_::readCiphertext("./cipher/layer2.3.bin");
     print_shape(scheme.decrypt(secretKey, cipher_res), 16, 32, "../../data/Layer2.txt");
 
-    heaan::numThreads = 64;
+    heaan::numThreads = 32;
 
     timeutils.start("layer3");
     if (!SerializationUtils_::checkFile("./cipher/layer3.3.bin")) {

@@ -15,6 +15,17 @@ using namespace NTL;
 
 namespace heaan {
 
+static const long CONV2D = 0;
+static const long CONV2DFAST = 1;
+static const long CONV2DFASTDOWNSAMPLE = 2;
+static const long BN = 3;
+static const long RELU = 4;
+static const long ADD = 5;
+static const long DOWNSAMPLE = 6;
+static const long DOWNSAMPLEFAST = 7;
+static const long AVGPOOL = 8;
+static const long LINEAR = 9;
+
 class SerializationUtils_ : public SerializationUtils { 
 public:
 
@@ -107,6 +118,71 @@ static bool checkRightRotKey(Scheme &scheme, long r, string dir="./serkey") {
         return true;
     }
 }
+
+/**
+ * @brief Determine the requirement of left and right rotation keys for each layer
+ * 
+ * @param leftRotKeys 
+ * @param rightRotKeys 
+ * @param params each param = (long[4]){type, w, c_in, c_out}
+ */
+static void rotKeysRequirement(std::set<long>& leftRotKeys, std::set<long>& rightRotKeys, std::vector<std::array<long, 4>>& params) {
+    for (auto& param : params) {
+        long type = param[0];
+        long w = param[1];
+        long c_in = param[2];
+        long c_out = param[3];
+        if (type == CONV2D) {
+            leftRotKeys.insert({1, w, w * w});
+            rightRotKeys.insert({1, w, w * w});
+            for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w);
+        }
+        else if (type == CONV2DFAST) {
+            // {1, 2, 4, ..., c / 2} * w * w, {1, ..., c_out - 1} * w * w
+            leftRotKeys.insert({1, w});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w);
+            rightRotKeys.insert({1, w});
+            for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w);
+        }
+        else if (type == CONV2DFASTDOWNSAMPLE) {
+            leftRotKeys.insert({1, w, 3 * w / 2, 3 * w * w / 4});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w / 4);
+            rightRotKeys.insert({1, w, w / 2});
+            for (long i = 1; i < c_out; i++) rightRotKeys.insert(i * w * w / 4);
+            for (long i = 1; i <= w / 4; i <<= 1) leftRotKeys.insert({i, i * 3 * w / 2});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * 3 * w * w / 4);
+        }
+        else if (type == DOWNSAMPLE) {
+            leftRotKeys.insert({1, 3 * w / 2, 3 * w * w / 4});
+            rightRotKeys.insert({1, w / 2, w * w / 4});
+        }
+        else if (type == DOWNSAMPLEFAST) {
+            // {1, 2, 4, ..., w / 4} * {1, 3 * w / 2}, {1, 2, 4, ..., c / 2} * 3 * w * w / 4
+            for (long i = 1; i <= w / 4; i <<= 1) leftRotKeys.insert({i, i * 3 * w / 2});
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * 3 * w * w / 4);
+        }
+        else if (type == AVGPOOL) {
+            for (long i = w * w / 2; i > 0; i >>= 1) leftRotKeys.insert(i);
+        }
+        else if (type == LINEAR) {
+            for (long i = 1; i <= c_in / 2; i <<= 1) leftRotKeys.insert(i * w * w);
+            for (long i = 1; i <= c_out; i <<= 1) rightRotKeys.insert(i * w * w);
+        }
+    }
+}
+
+static void generateSerialLeftRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
+    for (long i : rotKeys) {
+        if (SerializationUtils_::checkLeftRotKey(scheme, i, path) == false) scheme.addLeftRotKey(secretKey, i);
+    }
+}
+
+static void generateSerialRightRotKeys(std::set<long>& rotKeys, Scheme_& scheme, SecretKey& secretKey, string path="./serkey") {
+    for (long i : rotKeys) {
+        if (SerializationUtils_::checkRightRotKey(scheme, i, path) == false) scheme.addRightRotKey(secretKey, i);
+    }
+}
+
 
 };
 

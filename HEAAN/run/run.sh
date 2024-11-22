@@ -12,9 +12,8 @@ while getopts "rcd" opt; do
             echo "Rebuilding done (cd to ../run)"
             ;;
         k)
-            echo "Cleaning Public Key and Secret Key..."
+            echo "Cleaning Public Key ..."
             rm ./serkey/*
-            rm secretKey.bin
             ;;
         c)
             echo "Cleaning Ciphers Saved..."

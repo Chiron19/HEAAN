@@ -27,6 +27,19 @@ using namespace std;
 using namespace NTL;
 using namespace heaan;
 
+template<typename T>
+std::ostream& operator<<(std::ostream& out, const std::set<T>& set)
+{
+    if (set.empty())
+        return out << "{}";
+    out << "{ " << *set.begin();
+    std::for_each(std::next(set.begin()), set.end(), [&out](const T& element)
+    {
+        out << ", " << element;
+    });
+    return out << " }";
+}
+
 int main(int argc, char **argv) {
     cout << "start" << endl;
     srand(time(NULL));
@@ -56,12 +69,12 @@ int main(int argc, char **argv) {
     };
     std::set<long> leftRotKeys;
     std::set<long> rightRotKeys;
-    rotKeysRequirement(leftRotKeys, rightRotKeys, params);
+    SerializationUtils_::rotKeysRequirement(leftRotKeys, rightRotKeys, params);
     cout << "leftRotKeys : " << leftRotKeys << endl;
     cout << "rightRotKeys: " << rightRotKeys << endl;
 
-    generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
-    generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialLeftRotKeys(leftRotKeys, scheme, secretKey);
+    SerializationUtils_::generateSerialRightRotKeys(rightRotKeys, scheme, secretKey);
     
     cout << "key done" << endl;
 

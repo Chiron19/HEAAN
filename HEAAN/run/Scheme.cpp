@@ -9,62 +9,12 @@
 #include <iomanip>
 #include <pthread.h>
 
+#include "Scheme.h"
+
 using namespace std;
 using namespace NTL;
 
 namespace heaan {
-
-static long numThreads = 1;
-
-class Scheme_: public Scheme {
-public:
-
-Scheme_(SecretKey& secretKey, Ring& ring, bool isSerialized = false, std::string dir="./serkey") 
-: Scheme(secretKey, ring, isSerialized, dir) {}
-
-void packKernelConst(complex<double>* mvec, long n, double* kernel, long w, long c);
-void packKernel(complex<double>** mvec, double** kernel, long w, long c);
-void packConst(complex<double>* mvec, long n, double* const_vec, long w, long c);
-void packWeights(complex<double>* mvec, long n, double* weights, long w, long c);
-void maskSlot(complex<double>* mvec, long n, long w, long c_start_id);
-void maskSlotRow(complex<double>* mvec, long n, long c, long w, long step);
-void maskSlotColumn(complex<double>* mvec, long n, long c, long w, long step);
-void maskSlotChannel(complex<double>* mvec, long n, long c, long w, long step);
-void cipherConv3x3(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** kernel, Scheme_ &scheme, long w, long c);
-void cipherConv1x1(Ciphertext& cipher_res, Ciphertext& cipher_msg, double* kernel, Scheme_ &scheme, long w, long c);
-void cipherChannelSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id);
-void cipherChannelFastSumAndEqual(Ciphertext& cipher, Scheme_ &scheme, long w, long c, long c_target_id);
-void cipherConv2dLayer(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out);
-void cipherConv2dLayerFast(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in, long c_out);
-void cipherConv2dLayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double*** kernels, Scheme_ &scheme, long w, long c_in);
-void cipherConv2d1x1LayerFastDownsampling(Ciphertext &cipher_res, Ciphertext &cipher_msg, double** kernels, Scheme_ &scheme, long w, long c_in);
-void cipherDownsamplingRow(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingColumn(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingChannel(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsampling(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingRowFast(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingColumnFast(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingChannelFast(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherDownsamplingFast(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherBatchNormLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
-void cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta);
-void cipherReLUAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long opt=0);
-void cipherAvgPoolingAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c);
-void cipherLinearLayer(Ciphertext& cipher_res, Ciphertext& cipher_msg, double** weights, double* bias, Scheme_ &scheme, long w, long c_in, long c_out);
-
-};
-
-struct ThreadData {
-    Ciphertext* cipher_conv;
-    Ciphertext* cipher_msg;
-    double*** kernels;
-    Scheme_* scheme;
-    long w;
-    long c_in;
-    long kernel_index_start;
-    long kernel_index_end;
-    long cipher_index_start;
-};
 
 // Thread function inside `cipherConv2dLayer`
 static void* threadFunc_cipherConv2dLayer(void* arg) {
@@ -154,10 +104,10 @@ void Scheme_::packKernel(complex<double>** mvec, double** kernel, long w, long c
  * @param w 
  * @param c 
  */
-void Scheme_::packConst(complex<double>* mvec, long n, double* const_vec, long w, long c) {
+void Scheme_::packConst(complex<double>* mvec, long n, double* const_vec, long w, long c, double const_scale) {
     for (int i = 0; i < c; i++) {
         for (int j = 0; j < w * w; j++) {
-            mvec[i * w * w + j] = const_vec[i];
+            mvec[i * w * w + j] = const_vec[i] * const_scale;
         }
     }
     for (int i = c * w * w; i < n; i++) {
@@ -968,14 +918,14 @@ void Scheme_::cipherDownsamplingFast(Ciphertext& cipher_res, Ciphertext& cipher_
  * 
  * For each channel i, Y = gamma[i] * X + beta[i]
  */
-void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta) {
+void Scheme_::cipherBatchNormLayerAndEqual(Ciphertext& cipher_msg, Scheme_ &scheme, long w, long c, double* gamma, double* beta, double const_scale) {
     long n = cipher_msg.n;
     long logp = cipher_msg.logp;
     long logq = cipher_msg.logq;
     complex<double>* mvec_a = new complex<double>[n];
     complex<double>* mvec_b = new complex<double>[n];
-    packConst(mvec_a, n, gamma, w, c);
-    packConst(mvec_b, n, beta, w, c);
+    packConst(mvec_a, n, gamma, w, c, const_scale);
+    packConst(mvec_b, n, beta, w, c, const_scale);
     
     scheme.multByConstVecAndEqual(cipher_msg, mvec_a, logp);
     scheme.reScaleByAndEqual(cipher_msg, logp);
