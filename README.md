@@ -1,3 +1,42 @@
+# Quick Start
+The repository inherits the original features of HEAAN while adding children class to extend its utility.
+
+## Prerequisites
+- [`GMP`](https://gmplib.org)
+It is highly recommended to accelerate `NTL` components.
+
+- [`NTL`](http://www.shoup.net/ntl/)
+Enabling number theory computations in C++.
+
+## Build
+1. `cd HEAAN/lib` to enter the building directory.
+2. `make` to run the makefile.
+
+## Test
+1. `cd ../run` to enter the testing directory.
+2. `make test` to compile the `test.cpp` into `TestHEAAN` executable.
+3. `./TestHEAAN Encrypt` to run the executable.
+4. `make clean` to remove the executable.
+
+## Test Demo Model
+1. Ensure you are under `run` directory.
+2. Execute the `run.sh`, it is shell script to automatically compile the `new.cpp` into `new` executable and directly run it.
+3. The secret key `secretKey.bin` is generated and serialized under the current directory by default. You may specify to another path (see code implementation in `new.cpp`).
+4. The public key set and ciphertext checkpoints are serialized and saved under `serkey` and `cipher` directories. You may also specify to another paths.
+5. The result is printed on the console with 10 float numbers, indicating the prediction of each class, and the classification result is the index where the max value located.
+
+Example:
+```c++
+1.84347e-06 2.0560598e-06 4.6995515e-07 1.218864e-06 -1.2269359e-06 6.6855303e-07 1.1520117e-06 -3.0805123e-06 8.7770081e-07 -1.9588662e-07 
+Max value: 2.0560598e-06 at index: 1
+```
+
+## Test Layer Precision
+1. Compile the `test_layer.cpp` with same procedure above, modify the script file to accommodate your needs.
+
+## Python for Auxiliary
+1. Under the `Python` directory, there are some auxiliary programmes to play around CIFAR-10 datasets. All programmes are self-contained Jupyter notebooks, import the corresponding library and feel free to play with them. I suggest to start with `heaan_demo.ipynb`.
+
 # HEAAN
 HEAAN is software library that implements homomorphic encryption (HE) that supports fixed point arithmetics.
 This library supports approximate operations between rational numbers.

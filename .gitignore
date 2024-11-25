@@ -6,7 +6,13 @@ HEAAN/Release
 
 HEAAN/run/TestHEAAN
 
-HEAAN/run/**
+HEAAN/run/new
+
+HEAAN/run/*.bin
+
+HEAAN/run/cipher
+
+HEAAN/run/serkey
 
 HEAAN/lib/*.a
 
